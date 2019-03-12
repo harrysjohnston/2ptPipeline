@@ -1,23 +1,3 @@
-# from the ground-up:
-# specify everything in an .ini file
-# specify treecorr configs also -- point to another .ini for defaults
-# and overwrite in the main .ini?
-
-# take 2x input catalogs (fits format)
-# take 2x corresponding randoms catalogs
-# define & apply any relevant cuts on fits columns
-# run treecorr correlations (clustering only for now)
-# output to a single savedir per .ini file
-# with a single output name per correlation, default routines to avoid overwriting/confusion
-# all of this should be possible for sets of multiple correlations
-
-# extras:
-# switch to spawn jobs/run in serial
-# plotting routine? (back-burner)
-# subroutine to convert ascii inputs to fits? (back-burner)
-# MAKE THIS INTO 2 FUNCTIONS == AUTO-CORR AND CROSS-CORR
-
-# SCRIPT-LIKE to start -- can make classes etc., if required, later
 from os.path import join, expandvars, basename
 from os import mkdir
 from os.path import isdir
