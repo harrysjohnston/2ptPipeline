@@ -1,7 +1,7 @@
 # 2ptPipeline
 For development and testing of a 2-point statistics pipeline, using TreeCorr
 
-Usage: python w_pipeline.py <path/to/config/file> ...
+# Usage: python w_pipeline.py <path/to/config/file> ...
 
 optional arguments:
 
@@ -24,3 +24,4 @@ optional arguments:
                         
 See also the comments in the example_clustering_config.ini file
 
+# Note: currently require separate config files for angular/projected stats
