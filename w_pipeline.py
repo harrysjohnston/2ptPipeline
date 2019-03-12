@@ -37,7 +37,10 @@ def ds_func(cat, rcat, target=10.):
 	randnum = np.random.rand(len(rcat))
 	cut = randnum < (len(cat)*target) / len(rcat)
 	return rcat[cut]
+
 def uhalfcut(arr,q=0):
+	# remove the largest half of parameter <arr>
+	# or largest quarter, if q=1
 	perc50 = np.percentile(arr, 50.)
 	perc25 = np.percentile(arr, 25.)
 	if q:
@@ -45,6 +48,8 @@ def uhalfcut(arr,q=0):
 	else:
 		return arr < perc50
 def lhalfcut(arr,q=0):
+	# remove the smallest half of parameter <arr>
+	# or smallest quarter, if q=1
 	perc50 = np.percentile(arr, 50.)
 	perc25 = np.percentile(arr, 75.)
 	if q:
@@ -52,9 +57,11 @@ def lhalfcut(arr,q=0):
 	else:
 		return arr > perc50
 def lqcut(arr,q=10.):
+	# remove all parameter <arr> less than quantile <q>
 	perc = np.percentile(arr, q)
 	return arr > perc
 def hqcut(arr,q=10.):
+	# remove all parameter <arr> greater than quantile <q>
 	perc = np.percentile(arr, q)
 	return arr < perc
 midpoints = lambda x: (x[1:] + x[:-1]) / 2.
