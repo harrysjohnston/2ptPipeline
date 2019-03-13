@@ -49,19 +49,22 @@ midpoints = lambda x: (x[1:] + x[:-1]) / 2.
 class Correlate:
 	def __init__(self, args):
 		cp.read(args.config_file)
-		if args.p is not None:
+		if args.p is not None: # override configuration file arguments on command line: -p <section>.<arg>=value
 			for ap in args.p:
 				s = ap.split('.')[0]
 				p, v = ap.replace(s, '')[1:].split('=')
-				if args.verbosity >= 1: print '== args: ', s, p, cp.get(s, p), '->', v
+				if args.verbosity >= 1 and cp.get(s, p) is not v:
+					print '== args: ', s, p, cp.get(s, p), '->', v
 				cp.set(s, p, value=v)
 		cpd = cp._sections
 
+		# get catalogue path lists
 		paths_data1 = expandvars(cp.get('catalogs', 'data1')).replace(' ', '').replace('\n', '').split('//')
 		paths_data2 = expandvars(cp.get('catalogs', 'data2')).replace(' ', '').replace('\n', '').split('//')
 		paths_rand1 = expandvars(cp.get('catalogs', 'rand1')).replace(' ', '').replace('\n', '').split('//')
 		paths_rand2 = expandvars(cp.get('catalogs', 'rand2')).replace(' ', '').replace('\n', '').split('//')
 
+		# get data/random selection/weighting expressions
 		data_cuts1 = cp.get('catalogs', 'data_cuts1').replace(' ', '').replace('\n', '').split('//')
 		data_cuts2 = cp.get('catalogs', 'data_cuts2').replace(' ', '').replace('\n', '').split('//')
 		rand_cuts1 = cp.get('catalogs', 'rand_cuts1').replace(' ', '').replace('\n', '').split('//')
@@ -72,6 +75,7 @@ class Correlate:
 			print('\n== data_weights not set; assuming unity weights')
 			data_weights1 = ['ones'] * len(paths_data1)
 
+		# get correlation type list
 		corr_types = cp.get('catalogs', 'corr_types').replace(' ', '').replace('\n', '').split('//')
 		if corr_types == ['']:
 			print('\n== corr_types not set; assuming angular clustering for all')
@@ -80,11 +84,12 @@ class Correlate:
 			if corr_types[-1] == '': corr_types = corr_types[:-1]
 			assert all([ct in ['wth', 'wgp', 'wgg'] for ct in corr_types]), "Must specify corr_types as either 'wth' (angular clust.), 'wgg' (proj. clust.) or 'wgp' (proj. direct IA) per correlation -- adding more correlations soon"
 
+		# if not providing different catalogues/cuts/weights for cross-correlation,
+		# copy arguments for auto-correlations
 		if paths_data2 == ['']:
 			paths_data2 = list(paths_data1)
 		if paths_rand2 == ['']:
 			paths_rand2 = list(paths_rand1)
-
 		if data_cuts2 == ['']:
 			data_cuts2 = list(data_cuts1)
 		if rand_cuts2 == ['']:
@@ -92,6 +97,8 @@ class Correlate:
 		if data_weights2 == ['']:
 			data_weights2 = list(data_weights1)
 
+		# ensure each argument is specified once, to be carried over for all correlations,
+		# or for each correlation individually
 		ncats = (len(paths_data1), len(paths_data2), len(paths_rand1), len(paths_rand2))
 		ncuts = (len(data_cuts1), len(data_cuts2), len(rand_cuts1), len(rand_cuts2))
 		nweights = (len(data_weights1), len(data_weights2))
@@ -109,6 +116,7 @@ class Correlate:
 		if not len(set_ncorrtypes) == 1:
 			assert set_ncorrtypes == {1, max(set_ncorrtypes)}, "if not specifying multiple correlations for galaxy catalogs, give only 1 to be used for all catalogs"
 
+		# carry single-specifications over for all correlations
 		if len(paths_data1) == 1:
 			paths_data1 = paths_data1 * max(ncats + ncuts + nweights + ncorrtypes)
 		if len(paths_data2) == 1:
@@ -144,6 +152,7 @@ class Correlate:
 				outs[i] += '.dat'
 		outfiles = [join(outdir, out) for out in outs]
 
+		# construct correlations to loop over
 		if args.index is not None:
 			loop = np.arange(len(paths_data1))[args.index]
 		else:
@@ -255,7 +264,7 @@ class Correlate:
 	def compute_wgplus(self, d1, r1, d2, r2, outfile, wcol1=None, wcol2=None):
 		if not self.largePi:
 			Pi = np.linspace(self.min_rpar, self.max_rpar, self.nbins_rpar + 1)
-		else:
+		else: # define new Pi-range, with |Pi_max| = 1.5 * |max_arg|
 			dPi = (self.max_rpar - self.min_rpar) / self.nbins_rpar
 			Pi = np.arange(self.min_rpar*1.5, self.max_rpar*1.5 + dPi, step=dPi, dtype=float)
 		gt_3D = np.zeros([len(Pi)-1, self.nbins])
@@ -280,9 +289,10 @@ class Correlate:
 		varg = treecorr.calculateVarG(data2)
 
 		for p in range(len(Pi)-1):
-			if self.largePi & any(abs(Pi[p:p+2]) < self.max_rpar):
+			if self.largePi & any(abs(Pi[p:p+2]) < self.max_rpar): # skip any |Pi| < max_arg
 				continue
 
+			# limit correlation to this Pi-bin
 			conf_pi = self.tc_wgp_config.copy()
 			conf_pi['min_rpar'] = Pi[p]
 			conf_pi['max_rpar'] = Pi[p+1]
@@ -292,6 +302,7 @@ class Correlate:
 			ng.process_cross(data1, data2)
 			rg.process_cross(rand1, data2)
 
+			# calculate appropriate normalisation of terms for chosen estimator
 			if self.estimator == 'PW1': # RDs norm
 				f = data1.ntot / rand1.w.sum()
 				norm1 = rg.weight * f
@@ -306,20 +317,19 @@ class Correlate:
 				norm1 = ng.weight
 				norm2 = rg.weight
 
+			# subtract randoms correlations
 			if self.compensated:
 				gt_3D[p] += (ng.xi / norm1) - (rg.xi / norm2)
 				gx_3D[p] += (ng.xi_im / norm1) - (rg.xi_im / norm2)
 				varg_3D[p] += (varg / norm1) + (varg / norm2)
-			else:
+			else: # or not
 				gt_3D[p] += ng.xi / norm1
 				gx_3D[p] += ng.xi_im / norm1
 				varg_3D[p] += varg / norm1
 			DS_3D[p] += ng.weight
 			RS_3D[p] += rg.weight
 
-#		Pi = midpoints(Pi)
-#		gt = np.trapz(gt_3D, x=Pi, axis=0)
-#		gx = np.trapz(gx_3D, x=Pi, axis=0)
+		# compute/save projected statistics
 		gt = np.sum(gt_3D * (Pi[1] - Pi[0]), axis=0)
 		gx = np.sum(gx_3D * (Pi[1] - Pi[0]), axis=0)
 		varg = np.sum(varg_3D, axis=0)
@@ -329,9 +339,18 @@ class Correlate:
 		output = np.column_stack((r, gt, gx, varg**0.5, DS, RS))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgplus','wgcross','noise','DSpairs','RSpairs')))
 
+		# optionally, save the 2D paircounts (3D name is stupid, I know)
 		if self.save_3d:
-			if args.verbosity >= 1: print "== Saving 3D correlations"
-			output_dict = {'r':r,'Pi':Pi,'w3d':gt_3D,'wx3d':gx_3D,'noise3d':varg_3D**0.5,'DS_3d':DS_3D,'RS_3d':RS_3D}
+			if args.verbosity >= 1: print "==== Saving 3D correlations"
+
+			# with normalisations for paircounts
+			DSntot = data1.ntot * data2.ntot
+			if data1.ntot == data2.ntot:
+				DSntot -= data2.ntot
+			RSntot = rand1.ntot * data2.ntot
+
+			output_dict = {'r':r,'Pi':Pi,'w3d':gt_3D,'wx3d':gx_3D,'noise3d':varg_3D**0.5,'DS_3d':DS_3D,'RS_3d':RS_3D,
+							'DSntot':DSntot,'RSntot':RSntot}
 			if outfile.endswith('.dat'):
 				outfile3d = outfile.replace('.dat', '.p')
 			elif '.jk' in outfile:
@@ -370,9 +389,10 @@ class Correlate:
 #		rand2.w = np.array(np.random.rand(rand2.ntot) < f2, dtype=float)
 
 		for p in range(len(Pi)-1):
-			if self.largePi & any(abs(Pi[p:p+2]) < self.max_rpar):
+			if self.largePi & any(abs(Pi[p:p+2]) < self.max_rpar): # skip any |Pi| < max_arg
 				continue
 
+			# limit correlation to this Pi-bin
 			conf_pi = self.tc_wgp_config.copy()
 			conf_pi['min_rpar'] = Pi[p]
 			conf_pi['max_rpar'] = Pi[p+1]
@@ -386,40 +406,40 @@ class Correlate:
 				nn.process(data1)
 				rr.process(rand1)
 				nr.process(data1, rand1)
-				norm = rr.weight
-				mask1 = rr.weight != 0
-				xi = np.zeros_like(nn.weight)
-				varxi = np.zeros_like(nn.weight)
-				varxi[mask1] = 1. / (rr.weight[mask1] * nn.tot/rr.tot)
-				xi1 = nn.weight * (rand1.w.sum() * (rand1.w.sum()-1.)) / (data1.w.sum() * (data1.w.sum()-1.)) # DD * (n_R*(n_R-1)) / (n_D*(n_D-1))
-				xi2 = 2. * nr.weight * rand1.w.sum() / data1.w.sum() # DR * n_R / n_D
-				xi3 = rr.weight # RR
+				#norm = rr.weight
+				#mask1 = rr.weight != 0
+				#xi = np.zeros_like(nn.weight)
+				#varxi = np.zeros_like(nn.weight)
+				#varxi[mask1] = 1. / (rr.weight[mask1] * nn.tot/rr.tot)
+				#xi1 = nn.weight * (rand1.w.sum() * (rand1.w.sum()-1.)) / (data1.w.sum() * (data1.w.sum()-1.)) # DD * (n_R*(n_R-1)) / (n_D*(n_D-1))
+				#xi2 = 2. * nr.weight * rand1.w.sum() / data1.w.sum() # DR * n_R / n_D
+				#xi3 = rr.weight # RR
 				if self.compensated:
-					xi[mask1] = (xi1[mask1] - xi2[mask1] + xi3[mask1]) / norm[mask1]
-					#xi, varxi = nn.calculateXi(rr, dr=nr)
+					#xi[mask1] = (xi1[mask1] - xi2[mask1] + xi3[mask1]) / norm[mask1]
+					xi, varxi = nn.calculateXi(rr, dr=nr)
 				else:
-					xi[mask1] = xi1[mask1] / norm[mask1] - 1.
-					#xi, varxi = nn.calculateXi(rr)
+					#xi[mask1] = xi1[mask1] / norm[mask1] - 1.
+					xi, varxi = nn.calculateXi(rr)
 			else:
 				nn.process(data1, data2)
 				rr.process(rand1, rand2)
 				nr.process(data1, rand2)
 				rn.process(rand1, data2)
-				norm = rr.weight
-				mask1 = rr.weight != 0
-				xi = np.zeros_like(nn.weight)
-				varxi = np.zeros_like(nn.weight)
-				varxi[mask1] = 1. / (rr.weight[mask1] * nn.tot/rr.tot)
-				xi1 = nn.weight * (rand1.w.sum() * rand2.w.sum()) / (data1.w.sum() * data2.w.sum()) # D1D2 * (n_R1*n_R2) / (n_D1*n_D2)
-				xi2 = nr.weight * rand1.w.sum() / data1.w.sum() # D1R2 * n_R1 / n_D1
-				xi3 = rn.weight * rand2.w.sum() / data2.w.sum() # D2R1 * n_R2 / n_D2
-				xi4 = rr.weight # R1R2
+				#norm = rr.weight
+				#mask1 = rr.weight != 0
+				#xi = np.zeros_like(nn.weight)
+				#varxi = np.zeros_like(nn.weight)
+				#varxi[mask1] = 1. / (rr.weight[mask1] * nn.tot/rr.tot)
+				#xi1 = nn.weight * (rand1.w.sum() * rand2.w.sum()) / (data1.w.sum() * data2.w.sum()) # D1D2 * (n_R1*n_R2) / (n_D1*n_D2)
+				#xi2 = nr.weight * rand1.w.sum() / data1.w.sum() # D1R2 * n_R1 / n_D1
+				#xi3 = rn.weight * rand2.w.sum() / data2.w.sum() # D2R1 * n_R2 / n_D2
+				#xi4 = rr.weight # R1R2
 				if self.compensated:
-					xi[mask1] = (xi1[mask1] - xi2[mask1] - xi3[mask1] + xi4[mask1]) / norm[mask1]
-					#xi, varxi = nn.calculateXi(rr, dr=nr, rd=rn)
+					#xi[mask1] = (xi1[mask1] - xi2[mask1] - xi3[mask1] + xi4[mask1]) / norm[mask1]
+					xi, varxi = nn.calculateXi(rr, dr=nr, rd=rn)
 				else:
-					xi[mask1] = xi1[mask1] / norm[mask1] - 1.
-					#xi, varxi = nn.calculateXi(rr)
+					#xi[mask1] = xi1[mask1] / norm[mask1] - 1.
+					xi, varxi = nn.calculateXi(rr)
 
 			wgg_3D[p] += xi
 			varw_3D[p] += varxi
@@ -431,8 +451,7 @@ class Correlate:
 				RD_3D[p] += rn.weight
 			RR_3D[p] += rr.weight
 
-#		Pi = midpoints(Pi)
-#		wgg = np.trapz(wgg_3D, x=Pi, axis=0)
+		# compute/save projected statistics
 		wgg = np.sum(wgg_3D * (Pi[1] - Pi[0]), axis=0)
 		varw = np.sum(varw_3D, axis=0)
 		DDpair = np.sum(DD_3D, axis=0)
@@ -443,10 +462,24 @@ class Correlate:
 		output = np.column_stack((r, wgg, varw**0.5, DDpair, DRpair, RDpair, RRpair))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgg','noise','DDpairs','DRpairs','RDpairs','RRpairs')))
 
+		# optionally, save the 2D paircounts
 		if self.save_3d:
-			if args.verbosity >= 1: print "== Saving 3D correlations"
+			if args.verbosity >= 1: print "==== Saving 3D correlations"
+
+			# with normalisations
+			if auto:
+				DDntot = data1.ntot * (data1.ntot - 1)
+				RRntot = rand1.ntot * (rand1.ntot - 1)
+				DRntot = RDntot = data1.ntot * rand1.ntot
+			else:
+				DDntot = data1.ntot * data2.ntot
+				RRntot = rand1.ntot * rand2.ntot
+				DRntot = data1.ntot * rand2.ntot
+				RDntot = rand1.ntot * data2.ntot
+
 			output_dict = {'r':r,'Pi':Pi,'w3d':wgg_3D,'noise3d':varw_3D**0.5,
-						   'DD3d':DD_3D,'DR3d':DR_3D,'RD3d':RD_3D,'RR3d':RR_3D}
+						   'DD3d':DD_3D,'DR3d':DR_3D,'RD3d':RD_3D,'RR3d':RR_3D,
+						   'DDntot':DDntot,'DRntot':DRntot,'RDntot':RDntot,'RRntot':RRntot}
 			if outfile.endswith('.dat'):
 				outfile3d = outfile.replace('.dat', '.p')
 			elif '.jk' in outfile:
@@ -460,9 +493,10 @@ class Correlate:
 	def run_loop(self, args, run_jackknife=0, jk_number=0):
 		for i in tqdm(self.loop, ascii=True, desc='Running correlations', ncols=100):
 			if any((self.paths_data1[i] == '',
-					self.paths_rand1[i] == '')):
+					self.paths_rand1[i] == '')): # skip empty rows of config file
 				continue
 
+			# identify auto- vs. cross-correlations
 			if not ((self.paths_data1[i] == self.paths_data2[i]) & (self.paths_rand1[i] == self.paths_rand2[i]) &
 					(self.data_cuts1[i] == self.data_cuts2[i]) & (self.rand_cuts1[i] == self.rand_cuts2[i]) &
 					(self.data_weights1[i] == self.data_weights2[i])):
@@ -473,6 +507,7 @@ class Correlate:
 			if self.build_jackknife:
 				# build jackknife with uniform randoms
 				# use randoms jackknife to create galaxy jackknife
+				# NEEDS DEBUG
 				if self.corr_types[i] in ['wgp', 'wgg']:
 					rrcol = self.rand_ra_col_proj
 					rdcol = self.rand_dec_col_proj
@@ -519,28 +554,29 @@ class Correlate:
 				piter = iter(('== Calculating data cuts', '== Calculating data cuts',
 							 '== Calculating randoms cuts', '== Calculating randoms cuts'))
 
+			# evaluate data/randoms cuts
 			wcols = []
 			for cat, cut in zip(fits_cats, cat_cuts):
 				if args.verbosity >= 1: print(next(piter))
 				cuts = cut[i].split('&')
 				w = np.ones(len(cat), dtype=bool)
 
-				if run_jackknife:
+				if run_jackknife: # if doing jackknife, remove jackknife_ID == jk_number; will loop over all jk_numbers
 					self.Njk = len(set(cat['jackknife_ID']))
 					if jk_number == 0:
 						jk_number = 1
-					w &= (cat['jackknife_ID'] != 0)
+					w &= (cat['jackknife_ID'] != 0) # always exclude ID = 0 -- these galaxies were lost in the jackknife routine
 					w &= (cat['jackknife_ID'] != jk_number)
 					if all(cat['jackknife_ID'] != jk_number):
 						print "======== JACKKNIFE #%s FAILED TO EXCLUDE ANY GALAXIES -- must manually exclude this correlation"%(jk_number)
 					if args.verbosity >= 1: print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, len(set(cat['jackknife_ID'])), (~w).sum()*100./len(w)))
 
-				for col in np.sort(cat.columns.names):
-					for c in cuts:
-						if col in c:
-							crepl = c.replace(col, 'cat["%s"]'%col)
+				for col in np.sort(cat.columns.names): # loop over fits columns in catalogue
+					for c in cuts: # loop over specified cuts for this correlation
+						if col in c: # if this cut refers to this column
+							crepl = c.replace(col, 'cat["%s"]'%col) # edit the string
 							try:
-								colcut = eval(crepl)
+								colcut = eval(crepl) # and construct the boolean array
 								w &= colcut
 								lencol = float(len(colcut))
 								if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (c, (~colcut).sum()*100./lencol))
@@ -549,35 +585,45 @@ class Correlate:
 				wcols.append(w)
 
 			if args.verbosity >= 1: print '== Applying cuts..'
+			if args.verbosity >= 1: print '== Auto-correlation = ', auto
+			# apply the cuts to data/randoms
 			if auto:
 				d1 = d1[wcols[0]]
 				r1 = r1[wcols[1]]
-				d2 = d1.copy()
-				r2 = r1.copy()
+				d2 = d1
+				r2 = r1
 			else:
 				d1 = d1[wcols[0]]
 				d2 = d2[wcols[1]]
 				r1 = r1[wcols[2]]
 				r2 = r2[wcols[3]]
 
+			# downsample excess randoms to factor <args.down> more than the data
+			if args.down != 0:
+				if args.verbosity >= 1: print('== Downsampling randoms..')
 			if args.down == 0:
 				if args.verbosity >= 2: print('== No downsampling of randoms!')
 			elif len(r1) > args.down*(len(d1)):
 				r1 = ds_func(d1, r1, target=args.down)
-				if args.verbosity >= 2: print('== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)'
+				if args.verbosity >= 2: print('==== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)'
 						% (basename(self.paths_rand1[i]), len(r1), float(len(r1))/len(d1), basename(self.paths_data1[i]), len(d1)))
+
 			if not auto:
 				if (len(r2) > args.down*(len(d2))) & (args.down != 0):
 					r2 = ds_func(d2, r2, target=args.down)
-					if args.verbosity >= 2: print('== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)'
+					if args.verbosity >= 2: print('==== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)'
 							% (basename(self.paths_rand2[i]), len(r2), float(len(r2))/len(d2), basename(self.paths_data2[i]), len(d2)))
+			else:
+				d2 = d1
+				r2 = r1
 
 			if args.verbosity >= 1:
-				print "== data1: %s galaxies"%len(d1)
-				print "== data2: %s galaxies"%len(d2)
-				print "== rand1: %s galaxies"%len(r1)
-				print "== rand2: %s galaxies"%len(r2)
+				print "==== data1: %s galaxies"%len(d1)
+				print "==== data2: %s galaxies"%len(d2)
+				print "==== rand1: %s galaxies"%len(r1)
+				print "==== rand2: %s galaxies"%len(r2)
 
+			# optionally, save the treated catalogues for inspection
 			if args.save_cats:
 				td1 = Table(d1)
 				tr1 = Table(r1)
@@ -585,9 +631,11 @@ class Correlate:
 				tr2 = Table(r2)
 				td1.write(self.outfiles[i].replace('.dat', '_d1.fits'), overwrite=1, format='fits')
 				tr1.write(self.outfiles[i].replace('.dat', '_r1.fits'), overwrite=1, format='fits')
-				td2.write(self.outfiles[i].replace('.dat', '_d2.fits'), overwrite=1, format='fits')
-				tr2.write(self.outfiles[i].replace('.dat', '_r2.fits'), overwrite=1, format='fits')
+				if not auto:
+					td2.write(self.outfiles[i].replace('.dat', '_d2.fits'), overwrite=1, format='fits')
+					tr2.write(self.outfiles[i].replace('.dat', '_r2.fits'), overwrite=1, format='fits')
 
+			# determine galaxy weighting in similar fashion to evaluation of cuts above
 			if self.data_weights1[i] == 'ones':
 				wcol1 = np.ones(len(d1))
 			else:
@@ -613,11 +661,13 @@ class Correlate:
 						except:
 							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights2[i], col))
 
+			# edit .dat suffix if saving down jackknife measurements
 			if run_jackknife:
 				outfile = self.outfiles[i].replace('.dat', '.jk%s'%jk_number)
 			else:
 				outfile = self.outfiles[i]
 
+			# perform correlation
 			if self.corr_types[i] == 'wth':
 				self.compute_wtheta(d1, r1, outfile, auto=auto, d2=d2, r2=r2, wcol1=wcol1, wcol2=wcol2)
 			if self.corr_types[i] == 'wgp':
@@ -625,6 +675,7 @@ class Correlate:
 			if self.corr_types[i] == 'wgg':
 				self.compute_wgg(d1, r1, outfile, auto=auto, d2=d2, r2=r2, wcol1=wcol1, wcol2=wcol2)
 
+		# if doing jackknife, +1 to the jk_number and run again
 		if run_jackknife:
 			if jk_number < self.Njk:
 				self.run_loop(args, run_jackknife=1, jk_number=jk_number + 1)
@@ -632,6 +683,9 @@ class Correlate:
 				jk_number = 1
 
 	def collect_jackknife(self, column=3):
+		# collect-up jackknife measurements and construct
+		# jackknife covariance/add jackknife mean and stderr
+		# columns into main measurement output files
 		for i in tqdm(self.loop, ascii=True, desc='Collecting covariances', ncols=100):
 			if any((self.paths_data1[i] == '',
 					self.paths_rand1[i] == '')):
@@ -729,7 +783,6 @@ if __name__ == '__main__':
 
 
 #		if args.remask_randoms:
-#			print "YOU CALLED FOR REMASK RANDOMS, BUT IT BE BROKEN FAM -- FIX ME!"
 #			#import healpy as hp
 #			#nside = 2048
 #			#npix = hp.nside2npix(nside)
