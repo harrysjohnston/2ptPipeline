@@ -391,6 +391,8 @@ if __name__ == '__main__':
 		help='path to skyknife config file')
 	parser.add_argument(
 		'-data',
+		type=str,
+		nargs=4,
 		help='give details of data catalogue corresponding to the randoms:'
 				'(path, ra_colname, dec_colname, z_colname) -- will port jackknife sampling to the data')
 	parser.add_argument(
