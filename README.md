@@ -24,4 +24,15 @@ optional arguments:
                         
 See also the comments in the example_clustering_config.ini file
 
+# Jackknife: python skyknife.py <path/to/config/file> ...
+
+see notes in [jackknife] section of config file
+
+optional arguments:
+
+  
+  -data [4x args]    give data catalogue (1) path, (2) RA column, (3) declination column, (4) redshift column -- will port jackknife sampling from randoms into data
+                        
+  -p [P [P ...]]    override config-file parameters e.g. -p section.param=value (make sure no trailing slashes in paths)
+
 # Note: currently require separate config files for angular/projected stats

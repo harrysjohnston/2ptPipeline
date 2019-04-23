@@ -390,6 +390,10 @@ if __name__ == '__main__':
 		'config',
 		help='path to skyknife config file')
 	parser.add_argument(
+		'-data',
+		help='give details of data catalogue corresponding to the randoms:'
+				'(path, ra_colname, dec_colname, z_colname) -- will port jackknife sampling to the data')
+	parser.add_argument(
 		'-p',
 		nargs='*',
 		type=str,
@@ -405,7 +409,13 @@ if __name__ == '__main__':
 			continue
 		kw[section] = value
 	sk = Jackknife(args.config, **kw)
-	sk.create_jackknife()
+	rand_groups = sk.create_jackknife()
+
+	if args.data is not None:
+		catpath, ra_col, dec_col, z_col = args.data
+		sk_data = Jackknife(args.config, catpath=catpath,
+							ra_col=ra_col, dec_col=dec_col, z_col=z_col **kw)
+		data_groups = sk_data.create_jackknife(rand_groups)
 
 
 
