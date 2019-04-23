@@ -24,7 +24,7 @@ optional arguments:
                         
 See also the comments in the example_clustering_config.ini file
 
-# Jackknife: python skyknife.py <path/to/config/file> ...
+# Jackknife usage: python skyknife.py <path/to/config/file> ...
 
 Run this on each randoms/data catalogue-pair BEFORE running the correlation w_pipeline.py. See notes in [jackknife] section of config file for details.
 
