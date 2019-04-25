@@ -66,6 +66,14 @@ class Jackknife:
 		if plot is not None:
 			self.plot = int(plot)
 
+		exportlist = expandvars(cp.get('jackknife', 'exportto', fallback='')).replace('\n', '').replace(' //', '//')
+		if exportlist != '':
+			# initialise exports of the jackknife to other catalogues
+			exportsets = exportlist.split('//')
+			self.exports = {}
+			for cat, racol, decol, zcol in [i.split(' ') for i in exportsets if i != '']:
+				self.exports[cat] = racol, decol, zcol
+
 	def create_jackknife(self, groups=None):
 		if groups is None:
 			groups = self.define_initial_grouping()
@@ -134,7 +142,7 @@ class Jackknife:
 			plt.ylabel('DEC')
 			#plt.savefig(self.plot, bbox_inches='tight')
 			plt.show()
-			plt.tight_layout()
+		plt.tight_layout()
 
 	def slice_jackknife(self, groups, zbound=None, nbin=None):
 		print '== Attempting to slice samples in redshift..'
@@ -248,7 +256,9 @@ class Jackknife:
 				ms.append(mean_scale_i)
 			mean_scale = np.array(ms).mean()
 			if ( (mean_scale >= self.min_scale_deg) &
-				 (abs(ra_scale - dec_scale) < 0.5*max(ra_scale, dec_scale)) ):
+				 (ra_scale >= self.sc_tol * self.min_scale_deg) &
+				 (ra_scale >= self.sc_tol * self.min_scale_deg) ):
+				 #(abs(ra_scale - dec_scale) < 0.5*max(ra_scale, dec_scale)) ):
 				#print '%.2f, %.2f, %.2f'%(mean_scale, ra_scale, dec_scale)
 				for ng in new_groups:
 					final_groups.append(ng)
@@ -389,18 +399,19 @@ if __name__ == '__main__':
 	parser.add_argument(
 		'config',
 		help='path to skyknife config file')
-	parser.add_argument(
-		'-data',
-		type=str,
-		nargs=4,
-		help='give details of data catalogue corresponding to the randoms:'
-				'(path, ra_colname, dec_colname, z_colname) -- will port jackknife sampling to the data')
+	#parser.add_argument(
+	#	'-data',
+	#	type=str,
+	#	nargs=4,
+	#	help='give details of data catalogue corresponding to the randoms:'
+	#			'(path, ra_colname, dec_colname, z_colname) -- will port jackknife sampling to the data')
 	parser.add_argument(
 		'-p',
 		nargs='*',
 		type=str,
 		default = [''],
-		help='with syntax "-p <arg1>=<value1>.." specify any of the following args: catpath, ra_col, dec_col, z_col, r_col, do_3d, sc_tol, sz_tol, min_scale_deg, plot')
+		help='with syntax "-p <arg1>=<value1>.." specify any of the following args: '
+				'catpath, ra_col, dec_col, z_col, r_col, do_3d, sc_tol, sz_tol, min_scale_deg, plot')
 	args = parser.parse_args()
 	#argsp = [ap.split(' ') for ap in args.p]
 	kw = {}
@@ -413,12 +424,19 @@ if __name__ == '__main__':
 	sk = Jackknife(args.config, **kw)
 	rand_groups = sk.create_jackknife()
 
-	if args.data is not None:
-		catpath, ra_col, dec_col, z_col = args.data
-		sk_data = Jackknife(args.config, catpath=catpath,
-							ra_col=ra_col, dec_col=dec_col, z_col=z_col **kw)
-		data_groups = sk_data.create_jackknife(rand_groups)
+	#if args.data is not None:
+	#	catpath, ra_col, dec_col, z_col = args.data
+	#	sk_data = Jackknife(args.config, catpath=catpath,
+	#						ra_col=ra_col, dec_col=dec_col, z_col=z_col, **kw)
+	#	data_groups = sk_data.create_jackknife(rand_groups)
 
+	if hasattr(sk, 'exports'):
+		for cat, (ra, dec, z) in sk.exports.iteritems():
+			print '== Exporting to %s..'%cat
+			sk_cat = Jackknife(args.config, catpath=cat,
+								ra_col=ra, dec_col=dec, z_col=z)
+			sk_cat.create_jackknife(rand_groups)
+		print '== done!'
 
 
 
