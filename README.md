@@ -26,13 +26,13 @@ See also the comments in the example_clustering_config.ini file
 
 # Jackknife usage: python skyknife.py <path/to/config/file> ...
 
-Run this on each randoms/data catalogue-pair BEFORE running the correlation w_pipeline.py. See notes in [jackknife] section of config file for details.
+Run this on each randoms catalogue BEFORE running the correlation w_pipeline.py -- specify the other catalogues within the config file (exportto=). See notes in [jackknife] section of config file for more details.
 
 optional arguments:
+                          
+  -p [P [P ...]]    with syntax "-p <arg1>=<value1>.." specify any of the
+                  following args: catpath, ra_col, dec_col, z_col, r_col,
+                  do_3d, sc_tol, sz_tol, min_scale_deg, plot
 
-  
-  -data [4x args]    give data catalogue (1) path, (2) RA column, (3) declination column, (4) redshift column, space-separated -- will port jackknife sampling from randoms into data. If not given, jackknife ID columns will only be created in the randoms
-                        
-  -p [P [P ...]]    override config-file parameters e.g. -p section.param=value (make sure no trailing slashes in paths)
 
 # Note: currently require separate config files for angular/projected stats
