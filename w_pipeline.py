@@ -78,30 +78,38 @@ class Correlate:
 		rand_cuts2 = cp.get('catalogs', 'rand_cuts2').replace(' ', '').replace('\n', '').split('//')
 		data_weights1 = cp.get('catalogs', 'data_weights1').replace(' ', '').replace('\n', '').split('//')
 		data_weights2 = cp.get('catalogs', 'data_weights2').replace(' ', '').replace('\n', '').split('//')
-		if data_weights1 == ['']:
-			if args.verbosity >= 1: print '== Galaxy weighting (data_weights) not set; assuming unity weights for all'
-			data_weights1 = ['ones'] * len(paths_data1)
 
 		# get correlation type list
 		corr_types = cp.get('catalogs', 'corr_types').replace(' ', '').replace('\n', '').split('//')
-		if corr_types == ['']:
+
+		paths_data1, paths_data2, paths_rand1, paths_rand2 = \
+			map(lambda x: [i for i in x if i != ''], [paths_data1, paths_data2, paths_rand1, paths_rand2])
+		data_cuts1, data_cuts2, rand_cuts1, rand_cuts2, data_weights1, data_weights2 = \
+			map(lambda x: [i for i in x if i != ''] or ['none'], [data_cuts1, data_cuts2, rand_cuts1, rand_cuts2, data_weights1, data_weights2])
+		corr_types = [i for i in corr_types if i != '']
+
+		# if not providing different catalogues/cuts/weights for cross-correlation,
+		# copy arguments for auto-correlations
+		if data_weights1 in [[''], []]:
+			if args.verbosity >= 1: print '== Galaxy weighting (data_weights) not set; assuming unity weights for all'
+			data_weights1 = ['ones'] * len(paths_data1)
+		if corr_types in [[''], []]:
 			print '== Correlation types (corr_types) not set; assuming angular clustering for all'
 			corr_types = ['wth'] * len(paths_data1)
 		else:
 			if corr_types[-1] == '': corr_types = corr_types[:-1]
-			assert all([ct in ['wth', 'wgp', 'wgg'] for ct in corr_types]), "Must specify corr_types as 'wth' (angular clust.), 'wgg' (proj. clust.) or 'wgp' (proj. direct IA) per correlation -- adding more correlations soon"
-
-		# if not providing different catalogues/cuts/weights for cross-correlation,
-		# copy arguments for auto-correlations
-		if paths_data2 == ['']:
+			assert all([ct in ['wth', 'wgp', 'wgg'] for ct in corr_types]), ("Must specify corr_types as 'wth' (angular clust.), "
+																			"'wgg' (proj. clust.) or 'wgp' (proj. direct IA) per correlation "
+																			 "-- adding more correlations soon")
+		if paths_data2 in [[''], []]:
 			paths_data2 = list(paths_data1)
-		if paths_rand2 == ['']:
+		if paths_rand2 in [[''], []]:
 			paths_rand2 = list(paths_rand1)
-		if data_cuts2 == ['']:
+		if data_cuts2 in [[''], []]:
 			data_cuts2 = list(data_cuts1)
-		if rand_cuts2 == ['']:
+		if rand_cuts2 in [[''], []]:
 			rand_cuts2 = list(rand_cuts1)
-		if data_weights2 == ['']:
+		if data_weights2 in [[''], []]:
 			data_weights2 = list(data_weights1)
 
 		# ensure each argument is specified once, to be carried over for all correlations,
@@ -151,7 +159,7 @@ class Correlate:
 		if not isdir(outdir):
 			mkdir(outdir)
 		outs = cp.get('output', 'out_corrs').replace(' ', '').replace('\n', '').split('//')
-		if outs == ['']:
+		if outs in [[''], []]:
 			print '== Assigning outfile names == corr2_out_XX.txt'
 			outs = ['corr2_out_%s.dat' % str(i).zfill(2) for i in range(len(paths_data1))]
 		for i in range(len(outs)):
@@ -160,10 +168,11 @@ class Correlate:
 		outfiles = [join(outdir, out) for out in outs]
 
 		# construct correlations to loop over
+		loop = np.arange(len(paths_data1), dtype=int)
 		if args.index is not None:
-			loop = np.arange(len(paths_data1))[args.index]
-		else:
-			loop = range(len(paths_data1))
+			loop = loop[args.index]
+		if args.randomise:
+			np.random.shuffle(loop)
 
 		# re-write this to include treecorr config options in my own config file?
 		tc_config_path = expandvars(cp.get('treecorr_config', 'default'))
@@ -261,7 +270,7 @@ class Correlate:
 			nr.process(data1, rand1)
 			nn.write(outfile, rr=rr, dr=nr, file_type='ASCII', prec=6)
 		else:
-			rn = treecorr.NNCorrelation(tc_config)
+			rn = treecorr.NNCorrelation(self.tc_config)
 			nn.process(data1, data2)
 			rr.process(rand1, rand2)
 			nr.process(data1, rand2)
@@ -543,12 +552,12 @@ class Correlate:
 			try:
 				d1 = fits.open(self.paths_data1[i])[1].data
 			except IOError:
-				print("==== %s not found! Skipping.."%self.paths_data1[i])
+				print("\n==== %s not found! Skipping.."%self.paths_data1[i])
 				continue
 			try:
 				r1 = fits.open(self.paths_rand1[i])[1].data
 			except IOError:
-				print("==== %s not found! Skipping.."%self.paths_rand1[i])
+				print("\n==== %s not found! Skipping.."%self.paths_rand1[i])
 				continue
 
 			if auto:
@@ -764,6 +773,11 @@ if __name__ == '__main__':
 		type=int,
 		nargs='*',
 		help='give indices of correlations in the config file that you desire to run -- others will be skipped. E.g. -index 0 will run only the first correlation')
+	parser.add_argument(
+		'-randomise',
+		type=int,
+		default=1,
+		help='1 = randomise the order of correlations for faster coverage with many runs (default)')
 	args = parser.parse_args()
 
 	Corr = Correlate(args)
