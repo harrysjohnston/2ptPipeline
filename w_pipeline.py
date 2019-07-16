@@ -105,11 +105,11 @@ class Correlate:
 			paths_data2 = list(paths_data1)
 		if paths_rand2 in [[''], []]:
 			paths_rand2 = list(paths_rand1)
-		if data_cuts2 in [[''], []]:
+		if data_cuts2 in [[''], [], ['none']]:
 			data_cuts2 = list(data_cuts1)
-		if rand_cuts2 in [[''], []]:
+		if rand_cuts2 in [[''], [], ['none']]:
 			rand_cuts2 = list(rand_cuts1)
-		if data_weights2 in [[''], []]:
+		if data_weights2 in [[''], [], ['none']]:
 			data_weights2 = list(data_weights1)
 
 		# ensure each argument is specified once, to be carried over for all correlations,
@@ -548,6 +548,17 @@ class Correlate:
 
 			if args.verbosity >= 1:
 				print "\n== Correlation: ", self.outfiles[i], '(jackknife #%s)'%jk_number
+			if args.verbosity >= 3:
+				print "\n====\n"
+				if auto:
+					print 'Auto-correlation:'
+					print self.paths_data1[i], 'WITH', self.paths_rand1[i]
+				else:
+					print 'Cross-correlation:'
+					print self.paths_data1[i], 'WITH', self.paths_rand1[i]
+					print 'vs.'
+					print self.paths_data2[i], 'WITH', self.paths_rand2[i]
+				print "\n====\n"
 
 			try:
 				d1 = fits.open(self.paths_data1[i])[1].data
@@ -640,20 +651,22 @@ class Correlate:
 
 			if args.verbosity >= 1:
 				print "==== data1: %s galaxies"%len(d1)
-				print "==== data2: %s galaxies"%len(d2)
 				print "==== rand1: %s galaxies"%len(r1)
-				print "==== rand2: %s galaxies"%len(r2)
+				if not auto:
+					print "==== data2: %s galaxies"%len(d2)
+					print "==== rand2: %s galaxies"%len(r2)
 
 			# optionally, save the treated catalogues for inspection
 			if args.save_cats:
 				td1 = Table(d1)
 				tr1 = Table(r1)
-				td2 = Table(d2)
-				tr2 = Table(r2)
 				td1.write(self.outfiles[i].replace('.dat', '_d1.fits'), overwrite=1, format='fits')
 				tr1.write(self.outfiles[i].replace('.dat', '_r1.fits'), overwrite=1, format='fits')
-				td2.write(self.outfiles[i].replace('.dat', '_d2.fits'), overwrite=1, format='fits')
-				tr2.write(self.outfiles[i].replace('.dat', '_r2.fits'), overwrite=1, format='fits')
+				if not auto:
+					td2 = Table(d2)
+					tr2 = Table(r2)
+					td2.write(self.outfiles[i].replace('.dat', '_d2.fits'), overwrite=1, format='fits')
+					tr2.write(self.outfiles[i].replace('.dat', '_r2.fits'), overwrite=1, format='fits')
 
 			# determine galaxy weighting in similar fashion to evaluation of cuts above
 			if self.data_weights1[i] in ['ones', 'none']:
@@ -756,8 +769,8 @@ if __name__ == '__main__':
 	parser.add_argument(
 		'-verbosity',
 		type=int,
-		default=0,
-		help='specify treecorr verbosity (int[0,3], default=0)')
+		default=3,
+		help='specify treecorr verbosity (int[0,3], default=3)')
 	parser.add_argument(
 		'-down',
 		type=float,
