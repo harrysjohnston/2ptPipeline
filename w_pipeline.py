@@ -595,13 +595,9 @@ class Correlate:
 				if args.verbosity >= 1: print(next(piter))
 				cuts = cut[i].split('&')
 				w = np.ones(len(cat), dtype=bool)
-				if cuts[0] == 'none':
-					if args.verbosity >= 1: print('==== no cuts!')
-					wcols.append(w)
-					continue
 
 				if run_jackknife: # if doing jackknife, remove jackknife_ID == jk_number; will loop over all jk_numbers
-					self.Njk = len(set(cat['jackknife_ID']))
+					self.Njk = len(set(cat['jackknife_ID'])) - 1
 					if jk_number == 0:
 						jk_number = 1
 					w &= (cat['jackknife_ID'] != 0) # always exclude ID = 0 -- these galaxies were lost in the jackknife routine
@@ -609,6 +605,11 @@ class Correlate:
 					if all(cat['jackknife_ID'] != jk_number):
 						print "======== JACKKNIFE #%s FAILED TO EXCLUDE ANY GALAXIES -- must manually exclude this correlation"%(jk_number)
 					if args.verbosity >= 1: print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, len(set(cat['jackknife_ID'])), (~w).sum()*100./len(w)))
+
+				if cuts[0] == 'none':
+					if args.verbosity >= 1: print('==== no cuts!')
+					wcols.append(w)
+					continue
 
 				for col in np.sort(cat.columns.names): # loop over fits columns in catalogue
 					for c in cuts: # loop over specified cuts for this correlation
