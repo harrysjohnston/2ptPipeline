@@ -85,11 +85,17 @@ class Correlate:
 		paths_data1, paths_data2, paths_rand1, paths_rand2 = \
 			map(lambda x: [i for i in x if i != ''], [paths_data1, paths_data2, paths_rand1, paths_rand2])
 		data_cuts1, data_cuts2, rand_cuts1, rand_cuts2, data_weights1, data_weights2 = \
-			map(lambda x: [i for i in x if i != ''] or ['none'], [data_cuts1, data_cuts2, rand_cuts1, rand_cuts2, data_weights1, data_weights2])
+			map(lambda x: [i for i in x if i != ''], [data_cuts1, data_cuts2, rand_cuts1, rand_cuts2, data_weights1, data_weights2])
 		corr_types = [i for i in corr_types if i != '']
 
 		# if not providing different catalogues/cuts/weights for cross-correlation,
 		# copy arguments for auto-correlations
+		if data_cuts1 in [[''], []]:
+			if args.verbosity >= 1: print '== No sample cuts (data_cuts) specified; none'
+			data_cuts1 = ['none'] * len(paths_data1)
+		if rand_cuts1 in [[''], []]:
+			if args.verbosity >= 1: print '== No randoms cuts (rand_cuts) specified; none'
+			rand_cuts1 = ['none'] * len(paths_rand1)
 		if data_weights1 in [[''], []]:
 			if args.verbosity >= 1: print '== Galaxy weighting (data_weights) not set; assuming unity weights for all'
 			data_weights1 = ['ones'] * len(paths_data1)
@@ -105,11 +111,11 @@ class Correlate:
 			paths_data2 = list(paths_data1)
 		if paths_rand2 in [[''], []]:
 			paths_rand2 = list(paths_rand1)
-		if data_cuts2 in [[''], [], ['none']]:
+		if data_cuts2 in [[''], []]:
 			data_cuts2 = list(data_cuts1)
-		if rand_cuts2 in [[''], [], ['none']]:
+		if rand_cuts2 in [[''], []]:
 			rand_cuts2 = list(rand_cuts1)
-		if data_weights2 in [[''], [], ['none']]:
+		if data_weights2 in [[''], []]:
 			data_weights2 = list(data_weights1)
 
 		# ensure each argument is specified once, to be carried over for all correlations,
@@ -590,6 +596,7 @@ class Correlate:
 				cuts = cut[i].split('&')
 				w = np.ones(len(cat), dtype=bool)
 				if cuts[0] == 'none':
+					if args.verbosity >= 1: print('==== no cuts!')
 					wcols.append(w)
 					continue
 
