@@ -174,9 +174,16 @@ class Correlate:
 		outfiles = [join(outdir, out) for out in outs]
 
 		# construct correlations to loop over
-		loop = np.arange(len(paths_data1), dtype=int)
-		if args.index is not None:
-			loop = loop[args.index]
+		loop = range(len(paths_data1))
+		if (args.index is not None and
+			args.rindex is not None): # keep some/remove some
+			loop = [i for i in loop if loop.index(i) in args.index and loop.index(i) not in args.rindex]
+		elif (args.index is None and
+			  args.rindex is not None): # just remove some
+			loop = [i for i in loop if loop.index(i) not in args.rindex]
+		elif (args.index is not None and
+			  args.rindex is None): # just choose some
+			loop = [i for i in loop if loop.index(i) in args.index]
 		if args.randomise:
 			np.random.shuffle(loop)
 
@@ -794,6 +801,11 @@ if __name__ == '__main__':
 		type=int,
 		nargs='*',
 		help='give indices of correlations in the config file that you desire to run -- others will be skipped. E.g. -index 0 will run only the first correlation')
+	parser.add_argument(
+		'-rindex',
+		type=int,
+		nargs='*',
+		help='give indices of correlations in the config file that you desire NOT to run i.e. inverse of -index argument')
 	parser.add_argument(
 		'-randomise',
 		type=int,
