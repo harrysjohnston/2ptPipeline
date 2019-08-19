@@ -30,7 +30,7 @@ def betwixt_z(z1, z2):
 	return make_cut
 
 class Jackknife:
-	def __init__(self, config, catpath=None, ra_col=None, dec_col=None, r_col=None, z_col=None,
+	def __init__(self, config, catpath=None, ra_col=None, dec_col=None, r_col=None, z_col=None, shiftra=None,
 					do_3d=None, min_depth=None, sc_tol=None, sz_tol=None, min_scale_deg=None, plot=None):
 		cp.read(config)
 		self.catpath = expandvars(cp.get('jackknife', 'catalog'))
@@ -47,6 +47,7 @@ class Jackknife:
 		self.sc_tol = float(cp.get('jackknife', 'scale_tol'))
 		self.min_scale_deg = float(cp.get('jackknife', 'minimum_scale'))
 		self.plot = cp.get('jackknife', 'plot', fallback=None)
+		self.shiftra = float(cp.get('jackknife', 'shiftra', fallback=None))
 		if ra_col is not None:
 			self.ra_col = ra_col
 		if dec_col is not None:
@@ -65,6 +66,12 @@ class Jackknife:
 			self.min_depth = float(min_depth)
 		if plot is not None:
 			self.plot = int(plot)
+		if (shiftra is not None or
+			self.shiftra is not None):
+			self.shiftra = float(shiftra or self.shiftra)
+			self.mod = lambda ra: np.where(ra > self.shiftra, ra - 360., ra)
+		else:
+			self.mod = lambda ra: 1. * ra
 
 		exportlist = expandvars(cp.get('jackknife', 'exportto', fallback='')).replace('\n', '').replace(' //', '//')
 		if exportlist != '':
@@ -86,7 +93,7 @@ class Jackknife:
 				groups = self.slice_jackknife(groups)
 
 		# assign a jackknife ID to each galaxy in the catalogue
-		ra = self.cat[self.ra_col]
+		ra = self.mod(self.cat[self.ra_col])
 		dec = self.cat[self.dec_col]
 		cat_radec = np.column_stack((ra, dec))
 		jackknife_IDs = np.zeros_like(ra, dtype=int)
@@ -128,7 +135,7 @@ class Jackknife:
 		for i in np.unique(cat['jackknife_ID']):
 			if i == 0: continue
 			cut = cat['jackknife_ID'] == i
-			ra = cat['ra'][cut]
+			ra = self.mod(cat['ra'][cut])
 			dec = cat['dec'][cut]
 			if 's' not in kwargs.keys():
 				kwargs['s'] = 1
@@ -195,15 +202,17 @@ class Jackknife:
 		print '== comoving slice depths', np.diff(redge)
 		return final_groups
 
-	def define_initial_grouping(self, discont_factor_ra=100, discont_factor_dec=100):
-		ra, dec = self.cat[self.ra_col], self.cat[self.dec_col]
+	def define_initial_grouping(self, discont_tol_ra=1., discont_tol_dec=1.):
+		# discont_tolerances give the minimum gap [in deg] to
+		# be considered a gap in the survey footprint
+		ra, dec = self.mod(self.cat[self.ra_col]), self.cat[self.dec_col]
 		cat_radec = np.column_stack((ra, dec))
 		sra = np.sort(ra)
 		sdec = np.sort(dec)
 		dra = np.diff(sra)
 		ddec = np.diff(sdec)
-		discont_ra = np.where(dra > discont_factor_ra*dra.mean())[0]
-		discont_dec = np.where(ddec > discont_factor_dec*ddec.mean())[0]
+		discont_ra = np.where(dra > discont_tol_ra)[0]
+		discont_dec = np.where(ddec > discont_tol_dec)[0]
 		jumpsra = np.array([ra.min(), ra.max()])
 		jumpsdec = np.array([dec.min(), dec.max()])
 		jumpsra = np.append(jumpsra, sra[discont_ra])
@@ -257,7 +266,7 @@ class Jackknife:
 			mean_scale = np.array(ms).mean()
 			if ( (mean_scale >= self.min_scale_deg) &
 				 (ra_scale >= self.sc_tol * self.min_scale_deg) &
-				 (ra_scale >= self.sc_tol * self.min_scale_deg) ):
+				 (dec_scale >= self.sc_tol * self.min_scale_deg) ):
 				 #(abs(ra_scale - dec_scale) < 0.5*max(ra_scale, dec_scale)) ):
 				#print '%.2f, %.2f, %.2f'%(mean_scale, ra_scale, dec_scale)
 				for ng in new_groups:
@@ -294,7 +303,7 @@ class Jackknife:
 			mq4 = betwixt(*dims_q4)
 
 		gg = self.get_group_galaxies(gd)
-		gg_radec = np.column_stack((gg[self.ra_col], gg[self.dec_col]))
+		gg_radec = np.column_stack((self.mod(gg[self.ra_col]), gg[self.dec_col]))
 		q1 = gg[mq1(gg_radec)]
 		q2 = gg[mq2(gg_radec)]
 		q3 = gg[mq3(gg_radec)]
@@ -359,13 +368,13 @@ class Jackknife:
 			else:
 				make_catalog_cut = betwixt(gd['ra1'], gd['ra2'], gd['dec1'], gd['dec2'])
 
-		ra = self.cat[self.ra_col]
+		ra = self.mod(self.cat[self.ra_col])
 		dec = self.cat[self.dec_col]
 		cat_radec = np.column_stack((ra, dec))
 		group_galaxy_cut = make_catalog_cut(cat_radec)
 
 		group_galaxies = self.cat[group_galaxy_cut]
-		gra = group_galaxies[self.ra_col]
+		gra = self.mod(group_galaxies[self.ra_col])
 		gdec = group_galaxies[self.dec_col]
 
 		if gd['wrap']:
@@ -388,7 +397,7 @@ class Jackknife:
 			make_cut = betwixt_wrap(gd['gal_ra1'], gd['gal_ra2'], gd['gal_dec1'], gd['gal_dec2'])
 		else:
 			make_cut = betwixt(gd['gal_ra1'], gd['gal_ra2'], gd['gal_dec1'], gd['gal_dec2'])
-		cat_radec = np.column_stack((self.cat[self.ra_col], self.cat[self.dec_col]))
+		cat_radec = np.column_stack((self.mod(self.cat[self.ra_col]), self.cat[self.dec_col]))
 		group_galaxies = self.cat[make_cut(cat_radec)]
 
 		return group_galaxies

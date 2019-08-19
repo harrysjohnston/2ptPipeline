@@ -1,21 +1,23 @@
 print "\n2-point correlation pipeline -- Harry Johnston 2019"
 print "Work in progress!"
 print "hj@star.ucl.ac.uk\n"
-
-from os.path import join, expandvars, basename
-from os import mkdir
-from os.path import isdir
+import os
+import sys
+import pickle
+import treecorr
+import argparse
+import skyknife
+import numpy as np
+import configparser
+from os import mkdir, makedirs
+from tqdm import tqdm
+from os.path import isdir, join, expandvars, basename, dirname
 from astropy.io import fits, ascii
 from astropy.table import Table
-import configparser
 cp = configparser.ConfigParser()
-import numpy as np
-import treecorr
-from tqdm import tqdm
-import argparse
-import sys
-import skyknife
-import pickle
+
+def idmatch(c1, c2, idcol1, idcol2):
+	return np.isin(c1[idcol1], c2[idcol2])
 
 def ds_func(cat, rcat, target=10.):
 	# downsample size of <rcat> to <target> * size of <cat>
@@ -161,9 +163,7 @@ class Correlate:
 		if len(corr_types) == 1:
 			corr_types = corr_types * max(ncats + ncuts + nweights + ncorrtypes)
 
-		outdir = expandvars(cp.get('output', 'savedir'))
-		if not isdir(outdir):
-			mkdir(outdir)
+		# get output filenames or assign them
 		outs = cp.get('output', 'out_corrs').replace(' ', '').replace('\n', '').split('//')
 		if outs in [[''], []]:
 			print '== Assigning outfile names == corr2_out_XX.txt'
@@ -171,7 +171,13 @@ class Correlate:
 		for i in range(len(outs)):
 			if not outs[i].endswith('.dat'):
 				outs[i] += '.dat'
+
+		# create paths for outputs
+		outdir = expandvars(cp.get('output', 'savedir'))
 		outfiles = [join(outdir, out) for out in outs]
+		for i in range(len(outfiles)):
+			if not isdir(dirname(outfiles[i])):
+				makedirs(dirname(outfiles[i]))
 
 		# construct correlations to loop over
 		loop = range(len(paths_data1))
@@ -617,6 +623,19 @@ class Correlate:
 					if args.verbosity >= 1: print('==== no cuts!')
 					wcols.append(w)
 					continue
+
+				# perform ID cut - special cut
+				match_IDs = ['idmatch' in cut for cut in cuts]
+				if any(match_IDs):
+					idcut = np.array(cuts)[match_IDs][0]
+					c1, c2, id1, id2 = idcut.replace(' ','').replace('idmatch','').replace('(','').replace(')','').split(',')
+					exec "idcut_bool = idmatch(%s, %s, '%s', '%s')" % (c1, c2, id1, id2)
+					if idcut_bool.sum() > 0:
+						w &= idcut_bool
+						if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (idcut, (~idcut_bool).sum()*100./len(idcut_bool)))
+					else:
+						print '====== Error: ID matching failed! Skipping..'
+					del cuts[cuts.index(idcut)]
 
 				for col in np.sort(cat.columns.names): # loop over fits columns in catalogue
 					for c in cuts: # loop over specified cuts for this correlation
