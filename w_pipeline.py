@@ -287,14 +287,14 @@ class Correlate:
 			nn.process(data1)
 			rr.process(rand1)
 			nr.process(data1, rand1)
-			nn.write(outfile, rr=rr, dr=nr, file_type='ASCII', prec=6)
+			nn.write(outfile, rr=rr, dr=nr, file_type='ASCII', precision=6)
 		else:
 			rn = treecorr.NNCorrelation(self.tc_config)
 			nn.process(data1, data2)
 			rr.process(rand1, rand2)
 			nr.process(data1, rand2)
 			rn.process(rand1, data2)
-			nn.write(outfile, rr=rr, dr=nr, rd=rn, file_type='ASCII', prec=6)
+			nn.write(outfile, rr=rr, dr=nr, rd=rn, file_type='ASCII', precision=6)
 
 	def compute_wgplus(self, d1, r1, d2, r2, outfile, wcol1=None, wcol2=None):
 		if not self.largePi:
@@ -749,7 +749,7 @@ class Correlate:
 			else:
 				jk_number = 1
 
-	def collect_jackknife(self, column=3):
+	def collect_jackknife(self, columns=['wgplus','wgcross','wgg']):
 		# collect-up jackknife measurements and construct
 		# jackknife covariance/add jackknife mean and stderr
 		# columns into main measurement output files
@@ -760,20 +760,21 @@ class Correlate:
 			if not hasattr(self, 'Njk'):
 				self.Njk = len(set(fits.open(self.paths_data1[i])[1].data['jackknife_ID'])) - 1 # exclude zero!
 			jk_numbers = range(1, self.Njk + 1)
-			#try:
 			jk_data = [self.outfiles[i].replace('.dat', '.jk%s'%jkn) for jkn in jk_numbers]
-			data_arr = [np.loadtxt(jk, usecols=column) for jk in jk_data]
-			data_arr = np.array(data_arr)
-			cov = np.cov(data_arr, rowvar=0) * (self.Njk - 1.)**2. / self.Njk # jackknife re-norm without weights for now -- assume samples are not too diverse
-			stdev = np.sqrt(np.diag(cov))
-			mean = data_arr.mean(axis=0)
-			data = ascii.read(self.outfiles[i])
-			data['jackknife_err'] = stdev
-			data['jackknife_mean'] = mean
-			data.write(self.outfiles[i], format='ascii.commented_header', overwrite=1)
-			np.savetxt(self.outfiles[i].replace('.dat', '.cov'), cov)
-			#except:
-				#print '== Jackknife collection failed for corr # %s: '%i, self.paths_data1[i], '--', self.paths_data2[i]
+			asc_arr = [ascii.read(jk) for jk in jk_data]
+			for col in columns:
+				if col not in asc_arr[0].colnames:
+					continue
+				else:
+					data_arr = np.array([da[col] for da in asc_arr])
+					cov = np.cov(data_arr, rowvar=0) * (self.Njk - 1.)**2. / self.Njk # jackknife re-norm without weights for now -- assume samples are not too diverse
+					stdev = np.sqrt(np.diag(cov))
+					mean = data_arr.mean(axis=0)
+					data = ascii.read(self.outfiles[i])
+					data['%s_jackknife_err'%col] = stdev
+					data['%s_jackknife_mean'%col] = mean
+					data.write(self.outfiles[i], format='ascii.commented_header', overwrite=1)
+					np.savetxt(self.outfiles[i].replace('.dat', '_%s.cov'%col), cov)
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
