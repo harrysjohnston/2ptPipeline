@@ -132,21 +132,26 @@ class Jackknife:
 		if lencat > 1e5:
 			f = 1e5 / float(lencat)
 			cat = cat[np.random.rand(lencat) <= f]
+
+		unique_IDs = np.unique(cat['jackknife_ID'])
+		unique_IDs = unique_IDs[unique_IDs!=0]
 		cat_z = cat[self.z_col]
-		jack_z = [cat_z[cat['jackknife_ID']==i].mean() for i in np.unique(cat['jackknife_ID'])]
-		small_z = np.sort(jack_z)[:self.nzbin]
-		for i, iz in zip(np.unique(cat['jackknife_ID']), jack_z):
+		jack_z = [cat_z[cat['jackknife_ID']==i].mean() for i in unique_IDs]
+		small_z = np.sort(jack_z)[:len(unique_IDs)/self.nzbin]
+		for i, iz in zip(unique_IDs, jack_z):
 			if i == 0: continue
 			if iz not in small_z: continue
+
 			cut = cat['jackknife_ID'] == i
 			ra = self.mod(cat['ra'][cut])
 			dec = cat['dec'][cut]
-			if 's' not in kwargs.keys():
-				kwargs['s'] = 1
-			plt.scatter(ra, dec, **kwargs)
 			count_percentage = 100*len(ra)/float(len(cat))
 			ra_range = 'ra:%.2f'%(ra.max() - ra.min())
 			dec_range = 'dec:%.2f'%(dec.max() - dec.min())
+
+			if 's' not in kwargs.keys():
+				kwargs['s'] = 1
+			plt.scatter(ra, dec, **kwargs)
 			plt.annotate('\n'.join(('#%s'%i, '%.1f%%'%count_percentage, ra_range, dec_range)),
 						xy=(ra.mean(), dec.mean()), xycoords='data', fontsize=12, ha='center', va='center')
 			plt.xlabel('RA')
