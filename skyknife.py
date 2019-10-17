@@ -135,12 +135,18 @@ class Jackknife:
 
 		unique_IDs = np.unique(cat['jackknife_ID'])
 		unique_IDs = unique_IDs[unique_IDs!=0]
-		cat_z = cat[self.z_col]
-		jack_z = [cat_z[cat['jackknife_ID']==i].mean() for i in unique_IDs]
-		small_z = np.sort(jack_z)[:len(unique_IDs)/self.nzbin]
+
+		if self.do_3d:
+			cat_z = cat[self.z_col]
+			jack_z = [cat_z[cat['jackknife_ID']==i].mean() for i in unique_IDs]
+			small_z = np.sort(jack_z)[:len(unique_IDs)/self.nzbin]
+		else:
+			jack_z = np.ones_like(unique_IDs)
+
 		for i, iz in zip(unique_IDs, jack_z):
 			if i == 0: continue
-			if iz not in small_z: continue
+			if self.do_3d:
+				if iz not in small_z: continue
 
 			cut = cat['jackknife_ID'] == i
 			ra = self.mod(cat['ra'][cut])

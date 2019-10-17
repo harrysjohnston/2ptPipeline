@@ -637,6 +637,19 @@ class Correlate:
 						print '====== Error: ID matching failed! Skipping..'
 					del cuts[cuts.index(idcut)]
 
+				# perform custom downsample - special cut
+				custom_ds = ['custom_ds' in cut for cut in cuts]
+				if any(custom_ds):
+					dscut = np.array(cuts)[custom_ds][0]
+					custom_frac = dscut.replace('custom_ds(','').replace(')','')
+					dscut_bool = np.random.rand(len(w)) <= float(custom_frac)
+					if dscut_bool.sum() > 0:
+						w &= dscut_bool
+						if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (dscut, (~dscut_bool).sum()*100./len(dscut_bool)))
+					else:
+						print '====== Error: custom downsampling failed! Skipping..'
+					del cuts[cuts.index(dscut)]
+
 				for col in np.sort(cat.columns.names): # loop over fits columns in catalogue
 					for c in cuts: # loop over specified cuts for this correlation
 						if col in c: # if this cut refers to this column
