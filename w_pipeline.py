@@ -15,6 +15,7 @@ from os.path import isdir, join, expandvars, basename, dirname
 from astropy.io import fits, ascii
 from astropy.table import Table
 cp = configparser.ConfigParser()
+nn = lambda x: x[~np.isnan(x) & ~np.isinf(x)]
 
 def idmatch(c1, c2, idcol1, idcol2):
 	return np.isin(c1[idcol1], c2[idcol2])
@@ -28,8 +29,8 @@ def ds_func(cat, rcat, target=10.):
 def uhalfcut(arr,q=0):
 	# remove the largest half of parameter <arr>
 	# or largest quarter, if q=1
-	perc50 = np.percentile(arr, 50.)
-	perc25 = np.percentile(arr, 25.)
+	perc50 = np.percentile(nn(arr), 50.)
+	perc25 = np.percentile(nn(arr), 25.)
 	if q:
 		return arr < perc25
 	else:
@@ -37,19 +38,19 @@ def uhalfcut(arr,q=0):
 def lhalfcut(arr,q=0):
 	# remove the smallest half of parameter <arr>
 	# or smallest quarter, if q=1
-	perc50 = np.percentile(arr, 50.)
-	perc25 = np.percentile(arr, 75.)
+	perc50 = np.percentile(nn(arr), 50.)
+	perc25 = np.percentile(nn(arr), 75.)
 	if q:
 		return arr > perc25
 	else:
 		return arr > perc50
 def lqcut(arr,q=10.):
 	# remove all parameter <arr> less than quantile <q>
-	perc = np.percentile(arr, q)
+	perc = np.percentile(nn(arr), q)
 	return arr > perc
 def hqcut(arr,q=10.):
 	# remove all parameter <arr> greater than quantile <q>
-	perc = np.percentile(arr, q)
+	perc = np.percentile(nn(arr), q)
 	return arr < perc
 midpoints = lambda x: (x[1:] + x[:-1]) / 2.
 
@@ -295,6 +296,8 @@ class Correlate:
 			nr.process(data1, rand2)
 			rn.process(rand1, data2)
 			nn.write(outfile, rr=rr, dr=nr, rd=rn, file_type='ASCII', precision=6)
+		# remove the additional header with correlation details -- these are in the treecorr config file
+		os.system("sed -i -e '/##/ { d; }' %s"%outfile)
 
 	def compute_wgplus(self, d1, r1, d2, r2, outfile, wcol1=None, wcol2=None):
 		if not self.largePi:
@@ -309,7 +312,7 @@ class Correlate:
 		RS_3D = np.zeros([self.nbins_rpar, self.nbins])
 
 		data1 = treecorr.Catalog(ra=d1[self.ra_col_proj], dec=d1[self.dec_col_proj], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1,
-								 r=d1[self.r_col], g1=d1[self.g1_col] * self.fg1, g2=d1[self.g2_col] * self.fg2)
+								 r=d1[self.r_col])#, g1=d1[self.g1_col] * self.fg1, g2=d1[self.g2_col] * self.fg2)
 		data2 = treecorr.Catalog(ra=d2[self.ra_col_proj], dec=d2[self.dec_col_proj], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol2,
 								 r=d2[self.r_col], g1=d2[self.g1_col] * self.fg1, g2=d2[self.g2_col] * self.fg2)
 		rand1 = treecorr.Catalog(ra=r1[self.rand_ra_col_proj], dec=r1[self.rand_dec_col_proj], ra_units=self.ra_units, dec_units=self.dec_units,
@@ -565,9 +568,10 @@ class Correlate:
 					rand2_groups = rand2_sk.create_jackknife(rand_groups)
 					data2_groups = data2_sk.create_jackknife(rand_groups)
 
+			if args.verbosity >= 1: print '\n== Auto-correlation = ', auto
 			if args.verbosity >= 1:
 				print "\n== Correlation: ", self.outfiles[i], '(jackknife #%s)'%jk_number
-			if args.verbosity >= 3:
+			if args.verbosity >= 2:
 				print "\n====\n"
 				if auto:
 					print 'Auto-correlation:'
@@ -604,78 +608,87 @@ class Correlate:
 
 			# evaluate data/randoms cuts
 			wcols = []
-			for cat, cut in zip(fits_cats, cat_cuts):
+			for j, (cat, cut) in enumerate(zip(fits_cats, cat_cuts)):
 				if args.verbosity >= 1: print(next(piter))
 				cuts = cut[i].split('&')
 				w = np.ones(len(cat), dtype=bool)
-
-				if run_jackknife: # if doing jackknife, remove jackknife_ID == jk_number; will loop over all jk_numbers
-					self.Njk = len(set(cat['jackknife_ID'])) - 1
-					if jk_number == 0:
-						jk_number = 1
-					w &= (cat['jackknife_ID'] != 0) # always exclude ID = 0 -- these galaxies were lost in the jackknife routine
-					w &= (cat['jackknife_ID'] != jk_number)
-					if all(cat['jackknife_ID'] != jk_number):
-						print "======== JACKKNIFE #%s FAILED TO EXCLUDE ANY GALAXIES -- must manually exclude this correlation"%(jk_number)
-					if args.verbosity >= 1: print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, len(set(cat['jackknife_ID'])), (~w).sum()*100./len(w)))
 
 				if cuts[0] == 'none':
 					if args.verbosity >= 1: print('==== no cuts!')
 					wcols.append(w)
 					continue
+				else:
+					# perform ID cut - special cut
+					match_IDs = ['idmatch' in cut for cut in cuts]
+					if any(match_IDs):
+						idcut = np.array(cuts)[match_IDs][0]
+						c1, c2, id1, id2 = idcut.replace(' ','').replace('idmatch','').replace('(','').replace(')','').split(',')
+						exec "idcut_bool = idmatch(%s, %s, '%s', '%s')" % (c1, c2, id1, id2)
+						if idcut_bool.sum() > 0:
+							w &= idcut_bool
+							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (idcut, (~idcut_bool).sum()*100./len(idcut_bool)))
+						else:
+							print '====== Error: ID matching failed! Skipping..'
+						del cuts[cuts.index(idcut)]
 
-				# perform ID cut - special cut
-				match_IDs = ['idmatch' in cut for cut in cuts]
-				if any(match_IDs):
-					idcut = np.array(cuts)[match_IDs][0]
-					c1, c2, id1, id2 = idcut.replace(' ','').replace('idmatch','').replace('(','').replace(')','').split(',')
-					exec "idcut_bool = idmatch(%s, %s, '%s', '%s')" % (c1, c2, id1, id2)
-					if idcut_bool.sum() > 0:
-						w &= idcut_bool
-						if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (idcut, (~idcut_bool).sum()*100./len(idcut_bool)))
+					# perform custom downsample - special cut
+					custom_ds = ['custom_ds' in cut for cut in cuts]
+					if any(custom_ds):
+						dscut = np.array(cuts)[custom_ds][0]
+						custom_frac = dscut.replace('custom_ds(','').replace(')','')
+						dscut_bool = np.random.rand(len(w)) <= float(custom_frac)
+						if dscut_bool.sum() > 0:
+							w &= dscut_bool
+							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (dscut, (~dscut_bool).sum()*100./len(dscut_bool)))
+						else:
+							print '====== Error: custom downsampling failed! Skipping..'
+						del cuts[cuts.index(dscut)]
+
+					for col in np.sort(cat.columns.names): # loop over fits columns in catalogue
+						for c in cuts: # loop over specified cuts for this correlation
+							if col in c: # if this cut refers to this column
+								crepl = c.replace(col, 'cat["%s"]'%col) # edit the string
+								try:
+									colcut = eval(crepl) # and construct the boolean array
+									w &= colcut
+									lencol = float(len(colcut))
+									if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (c, (~colcut).sum()*100./lencol))
+								except:
+									if args.verbosity >= 2: print('==== cut="%s" mismatched to column="%s" -- no action' % (c, col))
+
+					zero_jk_cut = False
+					if run_jackknife: # if doing jackknife, remove jackknife_ID == jk_number; will loop over all jk_numbers
+						self.Njk = len(set(cat['jackknife_ID'])) - 1
+						if jk_number == 0:
+							jk_number = 1
+						w &= (cat['jackknife_ID'] != 0) # always exclude ID = 0 -- these galaxies were lost in the jackknife routine
+						wj = (cat['jackknife_ID'] != jk_number)
+						w &= wj
+						if all(cat['jackknife_ID'] != jk_number):
+							# jackknife sample may not be relevant given other cuts -- skip to next jk_number
+							zero_jk_cut = True
+						if args.verbosity >= 1: print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, (len(set(cat['jackknife_ID']))-1), (~wj).sum()*100./len(wj)))
+
+					# collect up cuts
+					#wcols.append(w)
+					# update the samples
+					fits_cats[j] = fits_cats[j][w]
+					if args.verbosity >= 1: print('==== total loss: %.1f%%' % ((~w).sum()*100./len(w)))
+					if auto:
+						d1 = fits_cats[0]
+						d2 = d1
+						r1 = fits_cats[1]
+						r2 = r1
 					else:
-						print '====== Error: ID matching failed! Skipping..'
-					del cuts[cuts.index(idcut)]
+						d1 = fits_cats[0]
+						d2 = fits_cats[1]
+						r1 = fits_cats[2]
+						r2 = fits_cats[3]
 
-				# perform custom downsample - special cut
-				custom_ds = ['custom_ds' in cut for cut in cuts]
-				if any(custom_ds):
-					dscut = np.array(cuts)[custom_ds][0]
-					custom_frac = dscut.replace('custom_ds(','').replace(')','')
-					dscut_bool = np.random.rand(len(w)) <= float(custom_frac)
-					if dscut_bool.sum() > 0:
-						w &= dscut_bool
-						if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (dscut, (~dscut_bool).sum()*100./len(dscut_bool)))
-					else:
-						print '====== Error: custom downsampling failed! Skipping..'
-					del cuts[cuts.index(dscut)]
+			if zero_jk_cut:
+				print '==== jackknife resampling does not apply -- skipping'
+				continue
 
-				for col in np.sort(cat.columns.names): # loop over fits columns in catalogue
-					for c in cuts: # loop over specified cuts for this correlation
-						if col in c: # if this cut refers to this column
-							crepl = c.replace(col, 'cat["%s"]'%col) # edit the string
-							try:
-								colcut = eval(crepl) # and construct the boolean array
-								w &= colcut
-								lencol = float(len(colcut))
-								if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (c, (~colcut).sum()*100./lencol))
-							except:
-								if args.verbosity >= 2: print('==== cut="%s" mismatched to column="%s" -- no action' % (c, col))
-				wcols.append(w)
-
-			if args.verbosity >= 1: print '== Applying cuts..'
-			if args.verbosity >= 1: print '== Auto-correlation = ', auto
-			# apply the cuts to data/randoms
-			if auto:
-				d1 = d1[wcols[0]]
-				r1 = r1[wcols[1]]
-				d2 = d1
-				r2 = r1
-			else:
-				d1 = d1[wcols[0]]
-				d2 = d2[wcols[1]]
-				r1 = r1[wcols[2]]
-				r2 = r2[wcols[3]]
 
 			# downsample excess randoms to factor <args.down> more than the data
 			if args.down != 0:
@@ -774,20 +787,33 @@ class Correlate:
 				self.Njk = len(set(fits.open(self.paths_data1[i])[1].data['jackknife_ID'])) - 1 # exclude zero!
 			jk_numbers = range(1, self.Njk + 1)
 			jk_data = [self.outfiles[i].replace('.dat', '.jk%s'%jkn) for jkn in jk_numbers]
-			asc_arr = [ascii.read(jk) for jk in jk_data]
+
+			# collect relevant jackknife measurements
+			asc_arr = []
+			for jk in jk_data:
+				try:
+					asc_arr.append(ascii.read(jk))
+				except: # some cuts may not have corresponding jackknife samples
+					print '\n==== %s jackknife missing -- continuing'%jk
+					continue
+			Njk_i = len(asc_arr)
+			if Njk_i == 0:
+				print '\n==== %s jackknife failed -- skipping'%self.outfiles[i]
+				continue
+
 			for col in columns:
 				if col not in asc_arr[0].colnames:
 					continue
 				else:
 					data_arr = np.array([da[col] for da in asc_arr])
-					cov = np.cov(data_arr, rowvar=0) * (self.Njk - 1.)**2. / self.Njk # jackknife re-norm without weights for now -- assume samples are not too diverse
+					cov = np.cov(data_arr, rowvar=0) * (Njk_i - 1.)**2. / Njk_i # jackknife re-norm without weights for now -- assume samples are not too diverse
 					stdev = np.sqrt(np.diag(cov))
 					mean = data_arr.mean(axis=0)
 					data = ascii.read(self.outfiles[i])
 					data['%s_jackknife_err'%col] = stdev
 					data['%s_jackknife_mean'%col] = mean
 					data.write(self.outfiles[i], format='ascii.commented_header', overwrite=1)
-					np.savetxt(self.outfiles[i].replace('.dat', '_%s.cov'%col), cov)
+					np.savetxt(self.outfiles[i].replace('.dat', '_%s.cov'%col), cov, header='Njk = %s'%Njk_i)
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()

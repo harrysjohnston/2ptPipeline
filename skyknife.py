@@ -31,7 +31,7 @@ def betwixt_z(z1, z2):
 
 class Jackknife:
 	def __init__(self, config, catpath=None, ra_col=None, dec_col=None, r_col=None, z_col=None, shiftra=None,
-					do_3d=None, min_depth=None, sc_tol=None, sz_tol=None, min_scale_deg=None, plot=None):
+					do_3d=None, min_depth=None, zlims=None, sc_tol=None, sz_tol=None, min_scale_deg=None, plot=None):
 		cp.read(config)
 		self.catpath = expandvars(cp.get('jackknife', 'catalog'))
 		if catpath is not None:
@@ -43,6 +43,7 @@ class Jackknife:
 		self.r_col = cp.get('jackknife', 'r_col')
 		self.do_3d = int(cp.get('jackknife', 'do_3d'))
 		self.min_depth = float(cp.get('jackknife', 'minimum_depth'))
+		self.zlims = [float(zl) for zl in cp.get('jackknife', 'zlims').split(' ')]
 		self.sz_tol = float(cp.get('jackknife', 'quarter_tol'))
 		self.sc_tol = float(cp.get('jackknife', 'scale_tol'))
 		self.min_scale_deg = float(cp.get('jackknife', 'minimum_scale'))
@@ -56,6 +57,8 @@ class Jackknife:
 			self.z_col = z_col
 		if do_3d is not None:
 			self.do_3d = int(do_3d)
+		if zlims is not None:
+			self.zlims = zlims
 		if sc_tol is not None:
 			self.sc_tol = float(sc_tol)
 		if sz_tol is not None:
@@ -90,7 +93,7 @@ class Jackknife:
 			print "==== %s (2D) jackknife samples " % len(groups)
 
 			if self.do_3d:
-				groups = self.slice_jackknife(groups)
+				groups = self.slice_jackknife(groups, zbound=self.zlims)
 
 		# assign a jackknife ID to each galaxy in the catalogue
 		ra = self.mod(self.cat[self.ra_col])
@@ -121,7 +124,10 @@ class Jackknife:
 		hdu.writeto(self.catpath, overwrite=1)
 
 		if self.plot:
-			self.plot_jackknife()
+			try:
+				self.plot_jackknife()
+			except:
+				print '== %s plotting failed?'%self.catpath
 
 		return groups
 
@@ -149,8 +155,13 @@ class Jackknife:
 				if iz not in small_z: continue
 
 			cut = cat['jackknife_ID'] == i
-			ra = self.mod(cat['ra'][cut])
-			dec = cat['dec'][cut]
+			try:
+				ra = self.mod(cat['ra'][cut])
+				dec = cat['dec'][cut]
+			except:
+				ra = self.mod(cat[self.ra_col][cut])
+				dec = cat[self.dec_col][cut]
+				
 			count_percentage = 100*len(ra)/float(len(cat))
 			ra_range = 'ra:%.2f'%(ra.max() - ra.min())
 			dec_range = 'dec:%.2f'%(dec.max() - dec.min())
@@ -162,7 +173,8 @@ class Jackknife:
 						xy=(ra.mean(), dec.mean()), xycoords='data', fontsize=12, ha='center', va='center')
 			plt.xlabel('RA')
 			plt.ylabel('DEC')
-			#plt.savefig(self.plot, bbox_inches='tight')
+			plt.title(self.catpath)
+			plt.savefig(self.plot, bbox_inches='tight')
 			plt.show()
 		plt.tight_layout()
 
