@@ -615,8 +615,6 @@ class Correlate:
 
 				if cuts[0] == 'none':
 					if args.verbosity >= 1: print('==== no cuts!')
-					wcols.append(w)
-					continue
 				else:
 					# perform ID cut - special cut
 					match_IDs = ['idmatch' in cut for cut in cuts]
@@ -656,34 +654,32 @@ class Correlate:
 								except:
 									if args.verbosity >= 2: print('==== cut="%s" mismatched to column="%s" -- no action' % (c, col))
 
-					zero_jk_cut = False
-					if run_jackknife: # if doing jackknife, remove jackknife_ID == jk_number; will loop over all jk_numbers
-						self.Njk = len(set(cat['jackknife_ID'])) - 1
-						if jk_number == 0:
-							jk_number = 1
-						w &= (cat['jackknife_ID'] != 0) # always exclude ID = 0 -- these galaxies were lost in the jackknife routine
-						wj = (cat['jackknife_ID'] != jk_number)
-						w &= wj
-						if all(cat['jackknife_ID'] != jk_number):
-							# jackknife sample may not be relevant given other cuts -- skip to next jk_number
-							zero_jk_cut = True
-						if args.verbosity >= 1: print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, (len(set(cat['jackknife_ID']))-1), (~wj).sum()*100./len(wj)))
+				zero_jk_cut = False
+				if run_jackknife: # if doing jackknife, remove jackknife_ID == jk_number; will loop over all jk_numbers
+					self.Njk = len(set(cat['jackknife_ID'])) - 1
+					if jk_number == 0:
+						jk_number = 1
+					w &= (cat['jackknife_ID'] != 0) # always exclude ID = 0 -- these galaxies were lost in the jackknife routine
+					wj = (cat['jackknife_ID'] != jk_number)
+					w &= wj
+					if all(cat['jackknife_ID'] != jk_number):
+						# jackknife sample may not be relevant given other cuts -- skip to next jk_number
+						zero_jk_cut = True
+					if args.verbosity >= 1: print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, (len(set(cat['jackknife_ID']))-1), (~wj).sum()*100./len(wj)))
 
-					# collect up cuts
-					#wcols.append(w)
-					# update the samples
-					fits_cats[j] = fits_cats[j][w]
-					if args.verbosity >= 1: print('==== total loss: %.1f%%' % ((~w).sum()*100./len(w)))
-					if auto:
-						d1 = fits_cats[0]
-						d2 = d1
-						r1 = fits_cats[1]
-						r2 = r1
-					else:
-						d1 = fits_cats[0]
-						d2 = fits_cats[1]
-						r1 = fits_cats[2]
-						r2 = fits_cats[3]
+				# update the samples
+				fits_cats[j] = fits_cats[j][w]
+				if args.verbosity >= 1: print('==== total loss: %.1f%%' % ((~w).sum()*100./len(w)))
+				if auto:
+					d1 = fits_cats[0]
+					d2 = d1
+					r1 = fits_cats[1]
+					r2 = r1
+				else:
+					d1 = fits_cats[0]
+					d2 = fits_cats[1]
+					r1 = fits_cats[2]
+					r2 = fits_cats[3]
 
 			if zero_jk_cut:
 				print '==== jackknife resampling does not apply -- skipping'
@@ -717,7 +713,7 @@ class Correlate:
 					print "==== rand2: %s galaxies"%len(r2)
 
 			# optionally, save the treated catalogues for inspection
-			if args.save_cats:
+			if args.save_cats and jk_number == 0:
 				td1 = Table(d1)
 				tr1 = Table(r1)
 				td1.write(self.outfiles[i].replace('.dat', '_d1.fits'), overwrite=1, format='fits')
