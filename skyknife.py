@@ -7,6 +7,8 @@ from astropy.io import fits
 from astropy.table import Table
 import configparser
 from os.path import join, expandvars, basename
+import kmeans_radec
+from kmeans_radec import KMeans, kmeans_sample
 cp = configparser.ConfigParser()
 def betwixt(ra1, ra2, dec1, dec2):
 	def make_cut(cat):
@@ -430,6 +432,30 @@ class Jackknife:
 
 		return group_galaxies
 
+	def kmeans(self, ncen=40):
+		randoms = self.cat.copy()
+		X = np.column_stack((self.mod(randoms[self.ra_col]), randoms[self.dec_col]))
+
+		km = kmeans_sample(X, ncen, maxiter=100, tol=1.0e-5)
+		jk_labels = km.labels + 1
+		t = Table(randoms)
+		t['jackknife_ID'] = jk_labels
+		t.write(self.catpath, overwrite=1)
+
+		if hasattr(self, 'exports'):
+			for cat in self.exports.keys():
+				print '== exporting jackknife to', cat
+				racol, decol, zcol = self.exports[cat]
+				try:
+					data = fits.open(cat)[1].data
+				except:
+					data = pd.read_csv(cat)
+				X2 = np.column_stack((self.mod(data[racol]), data[decol]))
+				jk_labels2 = km.find_nearest(X2) + 1
+				t2 = Table(data)
+				t2['jackknife_ID'] = jk_labels2
+				t2.write(cat, overwrite=1)
+
 import argparse
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
@@ -442,6 +468,11 @@ if __name__ == '__main__':
 	#	nargs=4,
 	#	help='give details of data catalogue corresponding to the randoms:'
 	#			'(path, ra_colname, dec_colname, z_colname) -- will port jackknife sampling to the data')
+	parser.add_argument(
+		'-kmeans',
+		type=int,
+		default=0,
+		help='Give desired Njk to define jackknife with kmeans_radec (2D only atm) -- default=0; use skyknife method')
 	parser.add_argument(
 		'-p',
 		nargs='*',
@@ -459,21 +490,18 @@ if __name__ == '__main__':
 			continue
 		kw[section] = value
 	sk = Jackknife(args.config, **kw)
-	rand_groups = sk.create_jackknife()
 
-	#if args.data is not None:
-	#	catpath, ra_col, dec_col, z_col = args.data
-	#	sk_data = Jackknife(args.config, catpath=catpath,
-	#						ra_col=ra_col, dec_col=dec_col, z_col=z_col, **kw)
-	#	data_groups = sk_data.create_jackknife(rand_groups)
-
-	if hasattr(sk, 'exports'):
-		for cat, (ra, dec, z) in sk.exports.iteritems():
-			print '== Exporting to %s..'%cat
-			sk_cat = Jackknife(args.config, catpath=cat,
-								ra_col=ra, dec_col=dec, z_col=z)
-			sk_cat.create_jackknife(rand_groups)
-		print '== done!'
+	if args.kmeans != 0:
+		sk.kmeans(ncen=args.kmeans)
+	else:
+		rand_groups = sk.create_jackknife()
+		if hasattr(sk, 'exports'):
+			for cat, (ra, dec, z) in sk.exports.iteritems():
+				print '== Exporting to %s..'%cat
+				sk_cat = Jackknife(args.config, catpath=cat,
+									ra_col=ra, dec_col=dec, z_col=z)
+				sk_cat.create_jackknife(rand_groups)
+			print '== done!'
 
 
 

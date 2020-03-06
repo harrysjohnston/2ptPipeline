@@ -84,8 +84,11 @@ class Correlate:
 		rand_cuts2 = cp.get('catalogs', 'rand_cuts2').replace(' ', '').replace('\n', '').split('//')
 		data_weights1 = cp.get('catalogs', 'data_weights1').replace(' ', '').replace('\n', '').split('//')
 		data_weights2 = cp.get('catalogs', 'data_weights2').replace(' ', '').replace('\n', '').split('//')
-		rand_weights1 = cp.get('catalogs', 'rand_weights1').replace(' ', '').replace('\n', '').split('//')
-		rand_weights2 = cp.get('catalogs', 'rand_weights2').replace(' ', '').replace('\n', '').split('//')
+		try:
+			rand_weights1 = cp.get('catalogs', 'rand_weights1').replace(' ', '').replace('\n', '').split('//')
+			rand_weights2 = cp.get('catalogs', 'rand_weights2').replace(' ', '').replace('\n', '').split('//')
+		except:
+			rand_weights1 = rand_weights2 = ['']
 
 		# get correlation type list
 		corr_types = cp.get('catalogs', 'corr_types').replace(' ', '').replace('\n', '').split('//')
@@ -315,6 +318,11 @@ class Correlate:
 		# remove the additional header with correlation details -- these are in the treecorr config file
 		os.system("sed -i -e '/##/ { d; }' %s"%outfile)
 
+		del data1, rand1, nn, nr, rr
+		if not auto:
+			del data2, rand2, rn
+		gc.collect()
+
 	def compute_wgplus(self, d1, r1, d2, r2, outfile, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
 		if not self.largePi:
 			Pi = np.linspace(self.min_rpar, self.max_rpar, self.nbins_rpar + 1)
@@ -433,6 +441,9 @@ class Correlate:
 				return None
 			pickle.dump(output_dict, open(outfile3d, 'w'))
 
+		del data1, rand1, data2, rand2, ng, rg
+		gc.collect()
+
 	def compute_wgg(self, d1, r1, outfile, auto=True, d2=None, r2=None, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
 		if not self.largePi:
 			Pi = np.linspace(self.min_rpar, self.max_rpar, self.nbins_rpar + 1)
@@ -542,6 +553,11 @@ class Correlate:
 				print "==== Unrecognised output type -- not saving 3D correlations"
 				return None
 			pickle.dump(output_dict, open(outfile3d, 'w'))
+
+		del data1, rand1, nn, nr, rr
+		if not auto:
+			del data2, rand2, rn
+		gc.collect()
 
 	#@profile
 	def run_loop(self, args, run_jackknife=0, jk_number=0):
@@ -686,7 +702,7 @@ class Correlate:
 						# jackknife sample may not be relevant given other cuts -- skip to next jk_number
 						zero_jk_cut = True
 					if args.verbosity >= 1:
-						print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, (len(set(cat['jackknife_ID']))-1), (~wj).sum()*100./len(wj)))
+						print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, self.Njk, (~wj).sum()*100./len(wj)))
 
 				# update the samples
 				fits_cats[j] = fits_cats[j][w]
@@ -738,11 +754,14 @@ class Correlate:
 				tr1 = Table(r1)
 				td1.write(self.outfiles[i].replace('.dat', '_d1.fits'), overwrite=1, format='fits')
 				tr1.write(self.outfiles[i].replace('.dat', '_r1.fits'), overwrite=1, format='fits')
+				del td1, tr1
 				if not auto:
 					td2 = Table(d2)
 					tr2 = Table(r2)
 					td2.write(self.outfiles[i].replace('.dat', '_d2.fits'), overwrite=1, format='fits')
 					tr2.write(self.outfiles[i].replace('.dat', '_r2.fits'), overwrite=1, format='fits')
+					del td2, tr2
+				gc.collect()
 
 			# determine galaxy weighting in similar fashion to evaluation of cuts above
 			if self.data_weights1[i] in ['ones', 'none']:
@@ -770,26 +789,26 @@ class Correlate:
 						except:
 							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights2[i], col))
 			if self.rand_weights1[i] in ['ones', 'none']:
-				rwcol1 = np.ones(len(d1))
+				rwcol1 = np.ones(len(r1))
 			else:
-				for col in np.sort(d1.columns.names):
+				for col in np.sort(r1.columns.names):
 					if col in self.rand_weights1[i]:
-						wcol = self.rand_weights1[i].replace(col, 'd1["%s"]'%col)
+						wcol = self.rand_weights1[i].replace(col, 'r1["%s"]'%col)
 						try:
 							rwcol1 = eval(wcol)
-							if args.verbosity >= 1: print('==== weight="%s" applied to data1' % self.rand_weights1[i])
+							if args.verbosity >= 1: print('==== weight="%s" applied to rand1' % self.rand_weights1[i])
 							break
 						except:
 							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights1[i], col))
 			if self.rand_weights2[i] in ['ones', 'none']:
-				rwcol2 = np.ones(len(d2))
+				rwcol2 = np.ones(len(r2))
 			else:
-				for col in np.sort(d2.columns.names):
+				for col in np.sort(r2.columns.names):
 					if col in self.rand_weights2[i]:
-						wcol = self.rand_weights2[i].replace(col, 'd2["%s"]'%col)
+						wcol = self.rand_weights2[i].replace(col, 'r2["%s"]'%col)
 						try:
 							rwcol2 = eval(wcol)
-							if args.verbosity >= 1: print('==== weight="%s" applied to data2' % self.rand_weights2[i])
+							if args.verbosity >= 1: print('==== weight="%s" applied to rand2' % self.rand_weights2[i])
 							break
 						except:
 							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights2[i], col))
