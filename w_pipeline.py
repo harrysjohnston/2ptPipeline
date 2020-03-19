@@ -260,6 +260,18 @@ class Correlate:
 			self.min_rpar = float(tc_wgp_config['min_rpar'])
 			self.max_rpar = float(tc_wgp_config['max_rpar'])
 			self.nbins_rpar = int(tc_wgp_config['nbins_rpar'])
+			try:
+				self.rpar_edges = np.array([float(i) for i in tc_wgp_config['rpar_edges'].replace(' ','').split(',')])
+				if not self.rpar_edges.min() < 0:
+					self.rpar_edges = np.append(self.rpar_edges[::-1]*-1., self.rpar_edges[1:])
+				assert 0 in self.rpar_edges, "Pi bins asymmetric!"
+				self.min_rpar = self.rpar_edges.min()
+				self.max_rpar = self.rpar_edges.max()
+				self.nbins_rpar = len(self.rpar_edges) - 1
+				print "== Specified (line-of-sight) Pi-binning (units of r_col):"
+				print self.rpar_edges
+			except:
+				self.rpar_edges = None
 			self.nbins = int(tc_wgp_config['nbins'])
 			self.largePi = int(tc_wgp_config['largepi'])
 			self.compensated = int(tc_wgp_config['compensated'])
@@ -324,7 +336,9 @@ class Correlate:
 		gc.collect()
 
 	def compute_wgplus(self, d1, r1, d2, r2, outfile, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
-		if not self.largePi:
+		if self.rpar_edges is not None:
+			Pi = self.rpar_edges.copy()
+		elif not self.largePi:
 			Pi = np.linspace(self.min_rpar, self.max_rpar, self.nbins_rpar + 1)
 		else: # define new Pi-range, with |Pi_max| = 1.5 * |max_arg|
 			dPi = (self.max_rpar - self.min_rpar) / self.nbins_rpar
@@ -411,8 +425,12 @@ class Correlate:
 			RS_3D[p] += rg.weight
 
 		# compute/save projected statistics
-		gt = np.sum(gt_3D * (Pi[1] - Pi[0]), axis=0)
-		gx = np.sum(gx_3D * (Pi[1] - Pi[0]), axis=0)
+		if self.rpar_edges is None:
+			gt = np.sum(gt_3D * (Pi[1] - Pi[0]), axis=0)
+			gx = np.sum(gx_3D * (Pi[1] - Pi[0]), axis=0)
+		else:
+			gt = np.trapz(gt_3D, x=midpoints(np.squeeze(Pi)), axis=0)
+			gx = np.trapz(gx_3D, x=midpoints(np.squeeze(Pi)), axis=0)
 		varg = np.sum(varg_3D, axis=0)
 		DS = np.sum(DS_3D, axis=0)
 		RS = np.sum(RS_3D, axis=0)
@@ -445,7 +463,9 @@ class Correlate:
 		gc.collect()
 
 	def compute_wgg(self, d1, r1, outfile, auto=True, d2=None, r2=None, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
-		if not self.largePi:
+		if self.rpar_edges is not None:
+			Pi = self.rpar_edges.copy()
+		elif not self.largePi:
 			Pi = np.linspace(self.min_rpar, self.max_rpar, self.nbins_rpar + 1)
 		else:
 			dPi = (self.max_rpar - self.min_rpar) / self.nbins_rpar
@@ -517,7 +537,10 @@ class Correlate:
 			RR_3D[p] += rr.weight
 
 		# compute/save projected statistics
-		wgg = np.sum(wgg_3D * (Pi[1] - Pi[0]), axis=0)
+		if self.rpar_edges is None:
+			wgg = np.sum(wgg_3D * (Pi[1] - Pi[0]), axis=0)
+		else:
+			wgg = np.trapz(wgg_3D, x=midpoints(np.squeeze(Pi)), axis=0)
 		varw = np.sum(varw_3D, axis=0)
 		DDpair = np.sum(DD_3D, axis=0)
 		DRpair = np.sum(DR_3D, axis=0)
@@ -952,8 +975,8 @@ if __name__ == '__main__':
 		Corr.run_loop(args, run_jackknife=1)
 		Corr.collect_jackknife()
 	elif Corr.run_jackknife == 2:
-		Corr.run_loop(args)
 		Corr.run_loop(args, run_jackknife=1)
+		Corr.run_loop(args)
 		Corr.collect_jackknife()
 	elif Corr.run_jackknife == 3:
 		Corr.run_loop(args)
