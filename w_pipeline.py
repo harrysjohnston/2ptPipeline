@@ -66,8 +66,8 @@ class Correlate:
 			for ap in args.p:
 				s = ap.split('.')[0]
 				p, v = ap.replace(s, '')[1:].split('=')
-				if args.verbosity >= 1 and cp.get(s, p) != v:
-					print '==== %s.%s:'%(s, p), cp.get(s, p), '->', v
+				if args.verbosity >= 1:
+					print '==== %s.%s:->%s'%(s, p, v)
 				cp.set(s, p, value=v)
 		cpd = cp._sections
 
@@ -288,6 +288,12 @@ class Correlate:
 			print "== Run_jackknife = 3 -- performing jackknife after main correlations"
 		if self.run_jackknife == 4:
 			print "== Run_jackknife = 4 -- collecting jackknife covariance only"
+		try:
+			self.jackknife_numbers = [int(i) for i in cp.get('jackknife', 'numbers').split(' ')]
+			print "== jackknife indices specified:"
+			print self.jackknife_numbers
+		except:
+			self.jackknife_numbers = None
 		self.paths_data1 = paths_data1
 		self.paths_data2 = paths_data2
 		self.paths_rand1 = paths_rand1
@@ -718,12 +724,20 @@ class Correlate:
 					self.Njk = len(jk_set)
 					if jk_number == 0:
 						jk_number = 1
+
+					if self.jackknife_numbers is not None:
+						if jk_number not in self.jackknife_numbers:
+							if args.verbosity >= 1: print('====== SKIP jackknife #%i specified; continuing'%jk_number)
+							continue
+
 					w &= (cat['jackknife_ID'] != 0) # always exclude ID = 0 -- these galaxies were lost in the jackknife routine
 					wj = (cat['jackknife_ID'] != jk_number)
 					w &= wj
+
 					if all(cat['jackknife_ID'] != jk_number):
 						# jackknife sample may not be relevant given other cuts -- skip to next jk_number
 						zero_jk_cut = True
+
 					if args.verbosity >= 1:
 						print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, self.Njk, (~wj).sum()*100./len(wj)))
 
