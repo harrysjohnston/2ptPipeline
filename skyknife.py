@@ -134,7 +134,7 @@ class Jackknife:
 		return groups
 
 	def plot_jackknife(self, **kwargs):
-		f, ax = plt.subplots(figsize=(10,8))
+		f, ax = plt.subplots(figsize=(16,9))
 		cat = fits.open(self.catpath)[1].data
 		lencat = len(cat)
 		if lencat > 1e5:
@@ -176,7 +176,7 @@ class Jackknife:
 			plt.xlabel('RA')
 			plt.ylabel('DEC')
 			plt.title(self.catpath)
-			plt.savefig(self.plot, bbox_inches='tight')
+			plt.savefig(self.catpath.replace('.fits','.jk.png'), bbox_inches='tight')
 			plt.show()
 		plt.tight_layout()
 
