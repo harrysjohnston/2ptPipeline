@@ -261,7 +261,7 @@ class Correlate:
 			self.max_rpar = float(tc_wgp_config['max_rpar'])
 			self.nbins_rpar = int(tc_wgp_config['nbins_rpar'])
 			try:
-				self.rpar_edges = np.array([float(i) for i in tc_wgp_config['rpar_edges'].replace(' ','').split(',')])
+				self.rpar_edges = np.array([float(i) for i in tc_wgp_config['rpar_edges'].replace(' ','').strip("'").strip('"').split(',')])
 				if not self.rpar_edges.min() < 0:
 					self.rpar_edges = np.append(self.rpar_edges[::-1]*-1., self.rpar_edges[1:])
 				assert 0 in self.rpar_edges, "Pi bins asymmetric!"
@@ -588,8 +588,19 @@ class Correlate:
 			del data2, rand2, rn
 		gc.collect()
 
-	#@profile
 	def run_loop(self, args, run_jackknife=0, jk_number=0):
+
+		# skip jackknife measurements, if specified
+		if run_jackknife:
+			if self.jackknife_numbers is not None:
+				if jk_number in self.jackknife_numbers:
+					pass
+				else:
+					if args.verbosity >= 1: print('====== SKIP jackknife #%i specified; continuing'%jk_number)
+					self.run_loop(args, run_jackknife=1, jk_number=jk_number + 1)
+					# break out of loop
+					return None
+
 		for i in tqdm(self.loop, ascii=True, desc='Running correlations', ncols=100):
 			if any((self.paths_data1[i] == '',
 					self.paths_rand1[i] == '')): # skip empty rows of config file
@@ -606,29 +617,29 @@ class Correlate:
 			else:
 				auto = True
 
-			if self.build_jackknife:
-				# build jackknife with uniform randoms
-				# use randoms jackknife to create galaxy jackknife
-				# NEEDS DEBUG
-				if self.corr_types[i] in ['wgp', 'wgg']:
-					rrcol = self.rand_ra_col_proj
-					rdcol = self.rand_dec_col_proj
-					rzcol = self.rand_r_col
-					zcol = self.r_col
-				else:
-					rrcol = self.ra_col
-					rdcol = self.dec_col
-					rzcol = None
-					zcol = None
-				rand_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_rand1[i], ra_col=rrcol, dec_col=rdcol, z_col=rzcol)
-				data_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_data1[i], ra_col=self.ra_col, dec_col=self.dec_col, z_col=zcol)
-				rand_groups = rand_sk.create_jackknife()
-				data_groups = data_sk.create_jackknife(rand_groups)
-				if not auto:
-					rand2_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_rand2[i], ra_col=rrcol, dec_col=rdcol, z_col=rzcol)
-					data2_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_data2[i], ra_col=self.ra_col, dec_col=self.dec_col, z_col=zcol)
-					rand2_groups = rand2_sk.create_jackknife(rand_groups)
-					data2_groups = data2_sk.create_jackknife(rand_groups)
+		#	if self.build_jackknife:
+		#		# build jackknife with uniform randoms
+		#		# use randoms jackknife to create galaxy jackknife
+		#		# NEEDS DEBUG
+		#		if self.corr_types[i] in ['wgp', 'wgg']:
+		#			rrcol = self.rand_ra_col_proj
+		#			rdcol = self.rand_dec_col_proj
+		#			rzcol = self.rand_r_col
+		#			zcol = self.r_col
+		#		else:
+		#			rrcol = self.ra_col
+		#			rdcol = self.dec_col
+		#			rzcol = None
+		#			zcol = None
+		#		rand_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_rand1[i], ra_col=rrcol, dec_col=rdcol, z_col=rzcol)
+		#		data_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_data1[i], ra_col=self.ra_col, dec_col=self.dec_col, z_col=zcol)
+		#		rand_groups = rand_sk.create_jackknife()
+		#		data_groups = data_sk.create_jackknife(rand_groups)
+		#		if not auto:
+		#			rand2_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_rand2[i], ra_col=rrcol, dec_col=rdcol, z_col=rzcol)
+		#			data2_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_data2[i], ra_col=self.ra_col, dec_col=self.dec_col, z_col=zcol)
+		#			rand2_groups = rand2_sk.create_jackknife(rand_groups)
+		#			data2_groups = data2_sk.create_jackknife(rand_groups)
 
 			if args.verbosity >= 1: print '\n== Auto-correlation = ', auto
 			if args.verbosity >= 1:
@@ -724,11 +735,6 @@ class Correlate:
 					self.Njk = len(jk_set)
 					if jk_number == 0:
 						jk_number = 1
-
-					if self.jackknife_numbers is not None:
-						if jk_number not in self.jackknife_numbers:
-							if args.verbosity >= 1: print('====== SKIP jackknife #%i specified; continuing'%jk_number)
-							continue
 
 					w &= (cat['jackknife_ID'] != 0) # always exclude ID = 0 -- these galaxies were lost in the jackknife routine
 					wj = (cat['jackknife_ID'] != jk_number)
@@ -872,7 +878,7 @@ class Correlate:
 			if jk_number < self.Njk:
 				self.run_loop(args, run_jackknife=1, jk_number=jk_number + 1)
 			else:
-				jk_number = 1
+				return None
 
 	def collect_jackknife(self, columns=['wgplus','wgcross','wgg','xi']):
 		# collect-up jackknife measurements and construct
