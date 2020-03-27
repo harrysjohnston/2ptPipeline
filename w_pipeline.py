@@ -461,6 +461,7 @@ class Correlate:
 			if outfile.endswith('.dat'):
 				outfile3d = outfile.replace('.dat', '.p')
 			elif '.jk' in outfile:
+				return None
 				outfile3d = outfile.replace('.jk', '.pjk')
 			else:
 				print "==== Unrecognised output type -- not saving 3D correlations"
@@ -598,10 +599,13 @@ class Correlate:
 				if jk_number in self.jackknife_numbers:
 					pass
 				else:
-					if args.verbosity >= 1: print('====== SKIP jackknife #%i specified; continuing'%jk_number)
-					self.run_loop(args, run_jackknife=1, jk_number=jk_number + 1)
-					# break out of loop
-					return None
+					if jk_number > max(self.jackknife_numbers):
+						return None
+					else:
+						if args.verbosity >= 1: print('====== SKIP jackknife #%i specified; continuing'%jk_number)
+						self.run_loop(args, run_jackknife=1, jk_number=jk_number + 1)
+						# break out of loop
+						return None
 
 		for i in tqdm(self.loop, ascii=True, desc='Running correlations', ncols=100):
 			if any((self.paths_data1[i] == '',
