@@ -218,7 +218,8 @@ class Correlate:
 			for option in cpd['treecorr_config'].keys():
 				if option == 'default': continue
 				tc_config[option] = cpd['treecorr_config'][option]
-			tc_config['bin_slop'] = args.bin_slop
+			if args.bin_slop is not None:
+				tc_config['bin_slop'] = args.bin_slop
 			tc_config['num_threads'] = args.num_threads
 			tc_config['verbose'] = args.verbosity
 			self.ra_col = tc_config['ra_col']
@@ -229,7 +230,8 @@ class Correlate:
 		except ValueError:
 			print "== No treecorr config passed -- parameters for projected correlations should be specified in w_pipe config"
 			tc_wgp_config = cpd['wgplus_config']
-			tc_wgp_config['bin_slop'] = args.bin_slop
+			if args.bin_slop is not None:
+				tc_wgp_config['bin_slop'] = args.bin_slop
 			tc_wgp_config['num_threads'] = args.num_threads
 			tc_wgp_config['verbose'] = args.verbosity
 			for option in cpd['treecorr_config'].keys():
@@ -941,8 +943,7 @@ if __name__ == '__main__':
 	parser.add_argument(
 		'-bin_slop',
 		type=float,
-		default=0.4,
-		help='specify treecorr bin_slop parameter (float, default=0.4)')
+		help='specify treecorr bin_slop parameter (float, default=None -- will use .ini value)')
 	parser.add_argument(
 		'-num_threads',
 		type=int,
@@ -953,11 +954,6 @@ if __name__ == '__main__':
 		type=int,
 		default=0,
 		help='save out fits catalogues (per correlation) for inspection')
-#	parser.add_argument(
-#		'-remask_randoms',
-#		type=int,
-#		default=0,
-#		help='DO NOT USE; causing bias by masking underdensities -- rewrite to take fits-mask file. Creates nside=2048 Healpix mask from data for application to randoms, set to 0 for no masking (default)')
 	parser.add_argument(
 		'-verbosity',
 		type=int,
