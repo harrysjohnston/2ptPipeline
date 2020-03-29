@@ -3,6 +3,7 @@ import matplotlib as mpl
 mpl.use('agg')
 import matplotlib.pyplot as plt
 import numpy as np
+import gc
 from astropy.io import fits
 from astropy.table import Table
 import configparser
@@ -455,6 +456,8 @@ class Jackknife:
 				t2 = Table(data)
 				t2['jackknife_ID'] = jk_labels2
 				t2.write(cat, overwrite=1)
+				del data, X2, t2
+				gc.collect()
 
 import argparse
 if __name__ == '__main__':
@@ -501,6 +504,8 @@ if __name__ == '__main__':
 				sk_cat = Jackknife(args.config, catpath=cat,
 									ra_col=ra, dec_col=dec, z_col=z)
 				sk_cat.create_jackknife(rand_groups)
+				del sk_cat
+				gc.collect()
 			print '== done!'
 
 
