@@ -264,6 +264,8 @@ class Correlate:
 			self.nbins_rpar = int(tc_wgp_config['nbins_rpar'])
 			try:
 				self.rpar_edges = np.array([float(i) for i in tc_wgp_config['rpar_edges'].replace(' ','').strip("'").strip('"').split(',')])
+				if self.rpar_edges[0] != 0:
+					self.rpar_edges = np.insert(self.rpar_edges, 0, 0.)
 				if not self.rpar_edges.min() < 0:
 					self.rpar_edges = np.append(self.rpar_edges[::-1]*-1., self.rpar_edges[1:])
 				assert 0 in self.rpar_edges, "Pi bins asymmetric!"

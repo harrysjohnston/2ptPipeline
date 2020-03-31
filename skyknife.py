@@ -447,16 +447,12 @@ class Jackknife:
 			for cat in self.exports.keys():
 				print '== exporting jackknife to', cat
 				racol, decol, zcol = self.exports[cat]
-				try:
-					data = fits.open(cat)[1].data
-				except:
-					data = pd.read_csv(cat)
-				X2 = np.column_stack((self.mod(data[racol]), data[decol]))
+				t1 = Table.read(cat)
+				X2 = np.column_stack((self.mod(t1[racol]), t1[decol]))
 				jk_labels2 = km.find_nearest(X2) + 1
-				t2 = Table(data)
-				t2['jackknife_ID'] = jk_labels2
-				t2.write(cat, overwrite=1)
-				del data, X2, t2
+				t1['jackknife_ID'] = jk_labels2
+				t1.write(cat, overwrite=1)
+				del X2, t1
 				gc.collect()
 
 import argparse
@@ -465,12 +461,6 @@ if __name__ == '__main__':
 	parser.add_argument(
 		'config',
 		help='path to skyknife config file')
-	#parser.add_argument(
-	#	'-data',
-	#	type=str,
-	#	nargs=4,
-	#	help='give details of data catalogue corresponding to the randoms:'
-	#			'(path, ra_colname, dec_colname, z_colname) -- will port jackknife sampling to the data')
 	parser.add_argument(
 		'-kmeans',
 		type=int,
@@ -484,7 +474,6 @@ if __name__ == '__main__':
 		help='with syntax "-p <arg1>=<value1>.." specify any of the following args: '
 				'catpath, ra_col, dec_col, z_col, r_col, do_3d, sc_tol, sz_tol, min_scale_deg, plot')
 	args = parser.parse_args()
-	#argsp = [ap.split(' ') for ap in args.p]
 	kw = {}
 	for arg in args.p:
 		try:
@@ -514,50 +503,3 @@ if __name__ == '__main__':
 
 
 
-
-
-
-
-# OLD CODE
-		#hra, bra = np.histogram(ra, bins='auto')
-		#hdec, bdec = np.histogram(dec, bins='auto')
-		#if ( (abs(bra[1]-bra[0]) < self.min_scale_deg) |
-		#	 (abs(bdec[1]-bdec[0]) < self.min_scale_deg) ):
-		#	nbin_ra = (ra.max() - ra.min()) // (self.min_scale_deg * 2)
-		#	nbin_dec = (dec.max() - dec.min()) // (self.min_scale_deg * 2)
-		#	if nbin_ra < 1:
-		#		nbin_ra = (ra.max() - ra.min()) // self.min_scale_deg
-		#		if nbin_ra < 1:
-		#			nbin_ra = 1
-		#	if nbin_dec < 1:
-		#		nbin_dec = (dec.max() - dec.min()) // self.min_scale_deg
-		#		if nbin_dec < 1:
-		#			nbin_dec = 1
-		#	hra, bra = np.histogram(ra, bins=int(nbin_ra))
-		#	hdec, bdec = np.histogram(dec, bins=int(nbin_dec))
-		#iedgera = np.where(hra != 0)[0]
-		#iedgedec = np.where(hdec != 0)[0]
-		#dhra = np.diff(hra)
-		#ddec = np.diff(hdec)
-		#for iera in iedgera[:-1]:
-		#	if any(hra[iera:iera+1] < abs(dhra[iera])):
-		#		iedgera = np.delete(iedgera, np.where(iedgera==iera)[0])
-		#for iedec in iedgedec[:-1]:
-		#	if any(hdec[iedec:iedec+1] < abs(dhdec[iedec])):
-		#		iedgedec = np.delete(iedgedec, np.where(iedgedec==iedec)[0])
-		#edgera = np.concatenate((bra[1:][iedgera], bra[:-1][iedgera]))
-		#edgedec = np.concatenate((bdec[1:][iedgedec], bdec[:-1][iedgedec]))
-		#edgera = np.unique(edgera)
-		#edgedec = np.unique(edgedec)
-		#dedgera = np.diff(edgera)
-		#dedgedec = np.diff(edgedec)
-		##if any(dedgera > 1.01*dedgera.min()):
-		##	jumpsra = np.concatenate((edgera[1:][dedgera > 1.01*dedgera.min()], edgera[:-1][dedgera > 1.01*dedgera.min()]))
-		##else:
-		#jumpsra = edgera.copy()
-		##if any(dedgedec > 1.01*dedgedec.min()):
-		##	jumpsdec = np.concatenate((edgedec[1:][dedgedec > 1.01*dedgedec.min()], edgedec[:-1][dedgedec > 1.01*dedgedec.min()]))
-		##else:
-		#jumpsdec = edgedec.copy()
-		#jumpsra = np.unique(jumpsra)
-		#jumpsdec = np.unique(jumpsdec)
