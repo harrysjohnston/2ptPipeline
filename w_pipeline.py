@@ -664,6 +664,13 @@ class Correlate:
 					print self.paths_data2[i], 'WITH', self.paths_rand2[i]
 				print "\n====\n"
 
+			# clean-up 
+			try: del d1, r1
+			except:	pass
+			try: del d2, r2
+			except:	pass
+			gc.collect()
+
 			try:
 				d1 = fits.open(self.paths_data1[i])[1].data
 			except IOError:

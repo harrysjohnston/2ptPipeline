@@ -177,9 +177,9 @@ class Jackknife:
 			plt.xlabel('RA')
 			plt.ylabel('DEC')
 			plt.title(self.catpath)
+			plt.tight_layout()
 			plt.savefig(self.catpath.replace('.fits','.jk.png'), bbox_inches='tight')
 			plt.show()
-		plt.tight_layout()
 
 	def slice_jackknife(self, groups, zbound=None, nbin=None):
 		print '== Attempting to slice samples in redshift..'
