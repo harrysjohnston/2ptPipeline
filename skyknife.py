@@ -93,7 +93,7 @@ class Jackknife:
 			stop = False
 			while not stop:
 				groups, stop = self.iterate_quarter_group(groups)
-			print "==== %s (2D) jackknife samples " % len(groups)
+			print("==== %s (2D) jackknife samples " % len(groups))
 
 			if self.do_3d:
 				groups = self.slice_jackknife(groups, zbound=self.zlims)
@@ -130,7 +130,7 @@ class Jackknife:
 			try:
 				self.plot_jackknife()
 			except:
-				print '== %s plotting failed?'%self.catpath
+				print('== %s plotting failed?'%self.catpath)
 
 		return groups
 
@@ -182,7 +182,7 @@ class Jackknife:
 			plt.show()
 
 	def slice_jackknife(self, groups, zbound=None, nbin=None):
-		print '== Attempting to slice samples in redshift..'
+		print('== Attempting to slice samples in redshift..')
 		z = self.cat[self.z_col].copy()
 		r = self.cat[self.r_col].copy()
 
@@ -227,15 +227,16 @@ class Jackknife:
 				final_groups.append(zgroup)
 
 		self.nzbin = nbin
-		print '==== %s slices; %s (3D) jackknife samples' % (nbin, len(final_groups))
-		print '== redshift slice edges: ', zedge
-		print '== comoving slice edges: ', redge
-		print '== comoving slice depths', np.diff(redge)
+		print('==== %s slices; %s (3D) jackknife samples' % (nbin, len(final_groups)))
+		print('== redshift slice edges: ', zedge)
+		print('== comoving slice edges: ', redge)
+		print('== comoving slice depths', np.diff(redge))
 		return final_groups
 
 	def define_initial_grouping(self, discont_tol_ra=1., discont_tol_dec=1.):
 		# discont_tolerances give the minimum gap [in deg] to
 		# be considered a gap in the survey footprint
+		print('== finding initial grouping..')
 		ra, dec = self.mod(self.cat[self.ra_col]), self.cat[self.dec_col]
 		cat_radec = np.column_stack((ra, dec))
 		sra = np.sort(ra)
@@ -285,7 +286,7 @@ class Jackknife:
 		return groups
 
 	def iterate_quarter_group(self, groups):
-		print '== %s groups; attempting to quarter..'%len(groups)
+		print('== %s groups; attempting to quarter..'%len(groups))
 		final_groups = []
 		for group in groups:
 			new_groups = self.quarter_group(group) # will return 1, 2 or 4 group dicts with ~same dims
@@ -299,7 +300,7 @@ class Jackknife:
 				 (ra_scale >= self.sc_tol * self.min_scale_deg) &
 				 (dec_scale >= self.sc_tol * self.min_scale_deg) ):
 				 #(abs(ra_scale - dec_scale) < 0.5*max(ra_scale, dec_scale)) ):
-				#print '%.2f, %.2f, %.2f'%(mean_scale, ra_scale, dec_scale)
+				#print('%.2f, %.2f, %.2f'%(mean_scale, ra_scale, dec_scale))
 				for ng in new_groups:
 					final_groups.append(ng)
 			else:
@@ -445,7 +446,7 @@ class Jackknife:
 
 		if hasattr(self, 'exports'):
 			for cat in self.exports.keys():
-				print '== exporting jackknife to', cat
+				print('== exporting jackknife to', cat)
 				racol, decol, zcol = self.exports[cat]
 				t1 = Table.read(cat)
 				X2 = np.column_stack((self.mod(t1[racol]), t1[decol]))
@@ -489,13 +490,13 @@ if __name__ == '__main__':
 		rand_groups = sk.create_jackknife()
 		if hasattr(sk, 'exports'):
 			for cat, (ra, dec, z) in sk.exports.iteritems():
-				print '== Exporting to %s..'%cat
+				print('== Exporting to %s..'%cat)
 				sk_cat = Jackknife(args.config, catpath=cat,
 									ra_col=ra, dec_col=dec, z_col=z)
 				sk_cat.create_jackknife(rand_groups)
 				del sk_cat
 				gc.collect()
-			print '== done!'
+			print('== done!')
 
 
 
