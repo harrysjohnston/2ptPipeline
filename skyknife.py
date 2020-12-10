@@ -97,6 +97,9 @@ class Jackknife:
 
 			if self.do_3d:
 				groups = self.slice_jackknife(groups, zbound=self.zlims)
+			plot = True
+		else:
+			plot = False
 
 		# assign a jackknife ID to each galaxy in the catalogue
 		ra = self.mod(self.cat[self.ra_col])
@@ -126,7 +129,7 @@ class Jackknife:
 		hdu = fits.BinTableHDU.from_columns(cols)
 		hdu.writeto(self.catpath, overwrite=1)
 
-		if self.plot:
+		if self.plot and plot:
 			try:
 				self.plot_jackknife()
 			except:
@@ -438,8 +441,10 @@ class Jackknife:
 		randoms = self.cat.copy()
 		X = np.column_stack((self.mod(randoms[self.ra_col]), randoms[self.dec_col]))
 
-		km = kmeans_sample(X, ncen, maxiter=100, tol=1.0e-5)
+		km = kmeans_sample(X, ncen, maxiter=100, tol=1.0e-5, nsample=len(X))
 		jk_labels = km.labels + 1
+		if self.do_3d:
+			jk_labels, zedge = self.slice_kmeans(jk_labels, zbound=self.zlims)
 		t = Table(randoms)
 		t['jackknife_ID'] = jk_labels
 		t.write(self.catpath, overwrite=1)
@@ -451,10 +456,79 @@ class Jackknife:
 				t1 = Table.read(cat)
 				X2 = np.column_stack((self.mod(t1[racol]), t1[decol]))
 				jk_labels2 = km.find_nearest(X2) + 1
+				if self.do_3d:
+					jk_labels2, zedge = self.slice_kmeans(jk_labels2, zbound=self.zlims, zedge=zedge)
 				t1['jackknife_ID'] = jk_labels2
 				t1.write(cat, overwrite=1)
 				del X2, t1
 				gc.collect()
+
+		if self.plot:
+			try:
+				self.plot_jackknife()
+			except:
+				print '== %s plotting failed?'%self.catpath
+
+	def slice_kmeans(self, jk_labels, zbound=None, nbin=None, zedge=None):
+		if zedge is None:
+			print '== Attempting to slice samples in redshift..'
+		assert len(jk_labels) == len(self.cat), "==== kmeans redshift slicing broken!"
+		z1 = self.cat[self.z_col].copy()
+		r1 = self.cat[self.r_col].copy()
+
+		if zbound is None:
+			zmin, zmax = np.percentile(z, [0.5, 99.5])
+		else:
+			zmin, zmax = zbound
+
+		cut = (z1 > zmin) & (z1 < zmax)
+		z = z1[cut]
+		r = r1[cut]
+		jk_labels[~cut] = 0
+		sz, sr = np.sort(z), np.sort(r)
+		zpdf, zbin = np.histogram(z, bins='auto')
+		zpdf = zpdf / float(zpdf.sum())
+		zcdf = np.cumsum(zpdf)
+
+		if zedge is not None:
+			nbin = len(zedge) - 1
+			redge = np.interp(zedge, sz, sr)
+			depth = np.diff(redge).min()
+			report = False
+		else:
+			report = True
+			if nbin is None:
+				nbin = 30 # start over-thin
+			fracs = np.linspace(0., 1., nbin + 1)
+			zedge = np.interp(fracs, zcdf, zbin[:-1])
+			#zedge = np.append(zedge, zmax)
+			redge = np.interp(zedge, sz, sr)
+			depth = np.diff(redge).min()
+
+			while float(depth) <= self.min_depth:
+				nbin -= 1
+				fracs = np.linspace(0., 1., nbin + 1)
+				zedge = np.interp(fracs, zcdf, zbin[:-1])
+				#zedge = np.append(zedge, zmax)
+				redge = np.interp(zedge, sz, sr)
+				depth = np.diff(redge).min()
+
+		n_jk = nbin * len(set(jk_labels[jk_labels!=0]))
+		jk_labels_sliced = jk_labels.copy()
+		i = 1
+		for jki in set(jk_labels[jk_labels!=0]):
+			for zi in range(nbin):
+				jk_labels_sliced[(z1 > zedge[zi]) & (z1 <= zedge[zi+1]) & (jk_labels == jki)] = i
+				i += 1
+		assert i - 1 == n_jk, "==== kmeans redshift slicing broken!"
+
+		self.nzbin = nbin
+		if report:
+			print '==== %s slices; %s (3D) jackknife samples' % (nbin, n_jk)
+			print '== redshift slice edges: ', np.round(zedge, 3)
+			print '== comoving slice edges: ', np.round(redge, 1)
+			print '== comoving slice depths', np.round(np.diff(redge), 1)
+		return jk_labels_sliced, zedge
 
 import argparse
 if __name__ == '__main__':
@@ -466,7 +540,7 @@ if __name__ == '__main__':
 		'-kmeans',
 		type=int,
 		default=0,
-		help='Give desired Njk to define jackknife with kmeans_radec (2D only atm) -- default=0; use skyknife method')
+		help='Give desired Njk to define jackknife with kmeans_radec, with/out equal-numbers redshift slicing as per config do_3d= argument -- default=0; use skyknife method')
 	parser.add_argument(
 		'-p',
 		nargs='*',
