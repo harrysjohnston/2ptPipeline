@@ -1,6 +1,6 @@
-print "\n2-point correlation pipeline -- Harry Johnston 2019"
-print "Work in progress!"
-print "hj@star.ucl.ac.uk\n"
+print("\n2-point correlation pipeline -- Harry Johnston 2019")
+print("Work in progress!")
+print("hj@star.ucl.ac.uk\n")
 import os
 import gc
 import pickle
@@ -59,15 +59,15 @@ midpoints = lambda x: (x[1:] + x[:-1]) / 2.
 
 class Correlate:
 	def __init__(self, args):
-		print '\n== Preparing correlations\n'
+		print('\n== Preparing correlations\n')
 		cp.read(args.config_file)
 		if args.p is not None: # override configuration file arguments on command line: -p <section>.<arg>=value
-			print '== Overriding config arguments from command line:'
+			print('== Overriding config arguments from command line:')
 			for ap in args.p:
 				s = ap.split('.')[0]
 				p, v = ap.replace(s, '')[1:].split('=')
 				if args.verbosity >= 1:
-					print '==== %s.%s:->%s'%(s, p, v)
+					print('==== %s.%s:->%s'%(s, p, v))
 				cp.set(s, p, value=v)
 		cpd = cp._sections
 
@@ -102,19 +102,19 @@ class Correlate:
 		# if not providing different catalogues/cuts/weights for cross-correlation,
 		# copy arguments for auto-correlations
 		if data_cuts1 in [[''], []]:
-			if args.verbosity >= 1: print '== No sample cuts (data_cuts) specified; none'
+			if args.verbosity >= 1: print('== No sample cuts (data_cuts) specified; none')
 			data_cuts1 = ['none'] * len(paths_data1)
 		if rand_cuts1 in [[''], []]:
-			if args.verbosity >= 1: print '== No randoms cuts (rand_cuts) specified; none'
+			if args.verbosity >= 1: print('== No randoms cuts (rand_cuts) specified; none')
 			rand_cuts1 = ['none'] * len(paths_rand1)
 		if data_weights1 in [[''], []]:
-			if args.verbosity >= 1: print '== Galaxy weighting (data_weights) not set; assuming unity weights for all'
+			if args.verbosity >= 1: print('== Galaxy weighting (data_weights) not set; assuming unity weights for all')
 			data_weights1 = ['ones'] * len(paths_data1)
 		if rand_weights1 in [[''], []]:
-			if args.verbosity >= 1: print '== Randoms weighting (rand_weights) not set; assuming unity weights for all'
+			if args.verbosity >= 1: print('== Randoms weighting (rand_weights) not set; assuming unity weights for all')
 			rand_weights1 = ['ones'] * len(paths_data1)
 		if corr_types in [[''], []]:
-			print '== Correlation types (corr_types) not set; assuming angular clustering for all'
+			print('== Correlation types (corr_types) not set; assuming angular clustering for all')
 			corr_types = ['wth'] * len(paths_data1)
 		else:
 			if corr_types[-1] == '': corr_types = corr_types[:-1]
@@ -184,7 +184,7 @@ class Correlate:
 		# get output filenames or assign them
 		outs = cp.get('output', 'out_corrs').replace(' ', '').replace('\n', '').split('//')
 		if outs in [[''], []]:
-			print '== Assigning outfile names == corr2_out_XX.txt'
+			print('== Assigning outfile names == corr2_out_XX.txt')
 			outs = ['corr2_out_%s.dat' % str(i).zfill(2) for i in range(len(paths_data1))]
 		for i in range(len(outs)):
 			if not outs[i].endswith('.dat'):
@@ -228,7 +228,7 @@ class Correlate:
 			self.dec_units = tc_config['dec_units']
 			self.tc_config = tc_config
 		except ValueError:
-			print "== No treecorr config passed -- parameters for projected correlations should be specified in w_pipe config"
+			print("== No treecorr config passed -- parameters for projected correlations should be specified in w_pipe config")
 			tc_wgp_config = cpd['wgplus_config']
 			if args.bin_slop is not None:
 				tc_wgp_config['bin_slop'] = args.bin_slop
@@ -272,8 +272,8 @@ class Correlate:
 				self.min_rpar = self.rpar_edges.min()
 				self.max_rpar = self.rpar_edges.max()
 				self.nbins_rpar = len(self.rpar_edges) - 1
-				print "== Specified (line-of-sight) Pi-binning (units of r_col):"
-				print self.rpar_edges
+				print("== Specified (line-of-sight) Pi-binning (units of r_col):")
+				print(self.rpar_edges)
 			except:
 				self.rpar_edges = None
 			self.nbins = int(tc_wgp_config['nbins'])
@@ -285,17 +285,17 @@ class Correlate:
 		self.build_jackknife = int(cp.get('jackknife', 'build', fallback=0))
 		self.run_jackknife = int(cp.get('jackknife', 'run', fallback=0))
 		if self.run_jackknife == 1:
-			print "== Run_jackknife = 1 -- performing N jackknife correlations excluding regions N"
+			print("== Run_jackknife = 1 -- performing N jackknife correlations excluding regions N")
 		if self.run_jackknife == 2:
-			print "== Run_jackknife = 2 -- performing jackknife before main correlations"
+			print("== Run_jackknife = 2 -- performing jackknife before main correlations")
 		if self.run_jackknife == 3:
-			print "== Run_jackknife = 3 -- performing jackknife after main correlations"
+			print("== Run_jackknife = 3 -- performing jackknife after main correlations")
 		if self.run_jackknife == 4:
-			print "== Run_jackknife = 4 -- collecting jackknife covariance only"
+			print("== Run_jackknife = 4 -- collecting jackknife covariance only")
 		try:
 			self.jackknife_numbers = [int(i) for i in cp.get('jackknife', 'numbers').split(' ')]
-			print "== jackknife indices specified:"
-			print self.jackknife_numbers
+			print("== jackknife indices specified:")
+			print(self.jackknife_numbers)
 		except:
 			self.jackknife_numbers = None
 		self.paths_data1 = paths_data1
@@ -450,7 +450,7 @@ class Correlate:
 
 		# optionally, save the 2D paircounts (3D name is stupid, I know)
 		if self.save_3d:
-			if args.verbosity >= 1: print "== Saving 3D correlations.."
+			if args.verbosity >= 1: print("== Saving 3D correlations..")
 
 			# with normalisations for paircounts
 			DSntot = data1.ntot * data2.ntot
@@ -466,7 +466,7 @@ class Correlate:
 				return None
 				outfile3d = outfile.replace('.jk', '.pjk')
 			else:
-				print "==== Unrecognised output type -- not saving 3D correlations"
+				print("==== Unrecognised output type -- not saving 3D correlations")
 				return None
 			pickle.dump(output_dict, open(outfile3d, 'w'))
 
@@ -563,7 +563,7 @@ class Correlate:
 
 		# optionally, save the 2D paircounts
 		if self.save_3d:
-			if args.verbosity >= 1: print "== Saving 3D correlations.."
+			if args.verbosity >= 1: print("== Saving 3D correlations..")
 
 			# with normalisations
 			if auto:
@@ -584,7 +584,7 @@ class Correlate:
 			elif '.jk' in outfile:
 				outfile3d = outfile.replace('.jk', '.pjk')
 			else:
-				print "==== Unrecognised output type -- not saving 3D correlations"
+				print("==== Unrecognised output type -- not saving 3D correlations")
 				return None
 			pickle.dump(output_dict, open(outfile3d, 'w'))
 
@@ -604,7 +604,7 @@ class Correlate:
 					if jk_number > max(self.jackknife_numbers):
 						return None
 					else:
-						if args.verbosity >= 1: print('====== SKIP jackknife #%i specified; continuing'%jk_number)
+						if args.verbosity >= 1: print('====== SKIP jackknife #%i specified; continuing'%jk_number))
 						self.run_loop(args, run_jackknife=1, jk_number=jk_number + 1)
 						# break out of loop
 						return None
@@ -649,20 +649,20 @@ class Correlate:
 		#			rand2_groups = rand2_sk.create_jackknife(rand_groups)
 		#			data2_groups = data2_sk.create_jackknife(rand_groups)
 
-			if args.verbosity >= 1: print '\n== Auto-correlation = ', auto
+			if args.verbosity >= 1: print('\n== Auto-correlation = ', auto)
 			if args.verbosity >= 1:
-				print "\n== Correlation: ", self.outfiles[i], '(jackknife #%s)'%jk_number
+				print("\n== Correlation: ", self.outfiles[i], '(jackknife #%s)'%jk_number)
 			if args.verbosity >= 2:
-				print "\n====\n"
+				print("\n====\n")
 				if auto:
-					print 'Auto-correlation:'
-					print self.paths_data1[i], 'WITH', self.paths_rand1[i]
+					print('Auto-correlation:')
+					print(self.paths_data1[i], 'WITH', self.paths_rand1[i])
 				else:
-					print 'Cross-correlation:'
-					print self.paths_data1[i], 'WITH', self.paths_rand1[i]
-					print 'vs.'
-					print self.paths_data2[i], 'WITH', self.paths_rand2[i]
-				print "\n====\n"
+					print('Cross-correlation:')
+					print(self.paths_data1[i], 'WITH', self.paths_rand1[i])
+					print('vs.')
+					print(self.paths_data2[i], 'WITH', self.paths_rand2[i])
+				print("\n====\n")
 
 			# clean-up 
 			try: del d1, r1
@@ -674,12 +674,12 @@ class Correlate:
 			try:
 				d1 = fits.open(self.paths_data1[i])[1].data
 			except IOError:
-				print("\n==== %s not found! Skipping.."%self.paths_data1[i])
+				print("\n==== %s not found! Skipping.."%self.paths_data1[i]))
 				continue
 			try:
 				r1 = fits.open(self.paths_rand1[i])[1].data
 			except IOError:
-				print("\n==== %s not found! Skipping.."%self.paths_rand1[i])
+				print("\n==== %s not found! Skipping.."%self.paths_rand1[i]))
 				continue
 
 			if auto:
@@ -697,12 +697,12 @@ class Correlate:
 			# evaluate data/randoms cuts
 			wcols = []
 			for j, (cat, cut) in enumerate(zip(fits_cats, cat_cuts)):
-				if args.verbosity >= 1: print(next(piter))
+				if args.verbosity >= 1: print(next(piter)))
 				cuts = cut[i].split('&')
 				w = np.ones(len(cat), dtype=bool)
 
 				if cuts[0] == 'none':
-					if args.verbosity >= 1: print('==== no cuts!')
+					if args.verbosity >= 1: print('==== no cuts!'))
 				else:
 					# perform ID cut - special cut
 					match_IDs = ['idmatch' in cut for cut in cuts]
@@ -712,9 +712,9 @@ class Correlate:
 						exec "idcut_bool = idmatch(%s, %s, '%s', '%s')" % (c1, c2, id1, id2)
 						if idcut_bool.sum() > 0:
 							w &= idcut_bool
-							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (idcut, (~idcut_bool).sum()*100./len(idcut_bool)))
+							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (idcut, (~idcut_bool).sum()*100./len(idcut_bool))))
 						else:
-							print '====== Error: ID matching failed! Skipping..'
+							print('====== Error: ID matching failed! Skipping..')
 						del cuts[cuts.index(idcut)]
 
 					# perform custom downsample - special cut
@@ -725,9 +725,9 @@ class Correlate:
 						dscut_bool = np.random.rand(len(w)) <= float(custom_frac)
 						if dscut_bool.sum() > 0:
 							w &= dscut_bool
-							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (dscut, (~dscut_bool).sum()*100./len(dscut_bool)))
+							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (dscut, (~dscut_bool).sum()*100./len(dscut_bool))))
 						else:
-							print '====== Error: custom downsampling failed! Skipping..'
+							print('====== Error: custom downsampling failed! Skipping..')
 						del cuts[cuts.index(dscut)]
 
 					for col in np.sort(cat.columns.names): # loop over fits columns in catalogue
@@ -738,9 +738,9 @@ class Correlate:
 									colcut = eval(crepl) # and construct the boolean array
 									w &= colcut
 									lencol = float(len(colcut))
-									if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (c, (~colcut).sum()*100./lencol))
+									if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (c, (~colcut).sum()*100./lencol)))
 								except:
-									if args.verbosity >= 2: print('==== cut="%s" mismatched to column="%s" -- no action' % (c, col))
+									if args.verbosity >= 2: print('==== cut="%s" mismatched to column="%s" -- no action' % (c, col)))
 
 				zero_jk_cut = False
 				if run_jackknife: # if doing jackknife, remove jackknife_ID == jk_number; will loop over all jk_numbers
@@ -760,11 +760,11 @@ class Correlate:
 						zero_jk_cut = True
 
 					if args.verbosity >= 1:
-						print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, self.Njk, (~wj).sum()*100./len(wj)))
+						print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, self.Njk, (~wj).sum()*100./len(wj))))
 
 				# update the samples
 				fits_cats[j] = fits_cats[j][w]
-				if args.verbosity >= 1: print('==== total loss: %.1f%%' % ((~w).sum()*100./len(w)))
+				if args.verbosity >= 1: print('==== total loss: %.1f%%' % ((~w).sum()*100./len(w))))
 				if auto:
 					d1 = fits_cats[0]
 					d2 = d1
@@ -777,34 +777,34 @@ class Correlate:
 					r2 = fits_cats[3]
 
 			if zero_jk_cut:
-				print '==== jackknife resampling does not apply -- skipping'
+				print('==== jackknife resampling does not apply -- skipping')
 				continue
 
 			# downsample excess randoms to factor <args.down> more than the data
 			if args.down != 0:
-				if args.verbosity >= 1: print('== Downsampling randoms..')
+				if args.verbosity >= 1: print('== Downsampling randoms..'))
 			if args.down == 0:
-				if args.verbosity >= 2: print('== No downsampling of randoms!')
+				if args.verbosity >= 2: print('== No downsampling of randoms!'))
 			elif len(r1) > args.down*(len(d1)):
 				r1 = ds_func(d1, r1, target=args.down)
-				if args.verbosity >= 2: print('==== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)'
+				if args.verbosity >= 2: print('==== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)')
 						% (basename(self.paths_rand1[i]), len(r1), float(len(r1))/len(d1), basename(self.paths_data1[i]), len(d1)))
 
 			if not auto:
 				if len(r2) > args.down*(len(d2)) and args.down != 0:
 					r2 = ds_func(d2, r2, target=args.down)
-					if args.verbosity >= 2: print('==== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)'
+					if args.verbosity >= 2: print('==== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)')
 							% (basename(self.paths_rand2[i]), len(r2), float(len(r2))/len(d2), basename(self.paths_data2[i]), len(d2)))
 			else:
 				d2 = d1
 				r2 = r1
 
 			if args.verbosity >= 1:
-				print "==== data1: %s galaxies"%len(d1)
-				print "==== rand1: %s galaxies"%len(r1)
+				print("==== data1: %s galaxies"%len(d1))
+				print("==== rand1: %s galaxies"%len(r1))
 				if not auto:
-					print "==== data2: %s galaxies"%len(d2)
-					print "==== rand2: %s galaxies"%len(r2)
+					print("==== data2: %s galaxies"%len(d2))
+					print("==== rand2: %s galaxies"%len(r2))
 
 			# optionally, save the treated catalogues for inspection
 			if args.save_cats and jk_number == 0:
@@ -830,10 +830,10 @@ class Correlate:
 						wcol = self.data_weights1[i].replace(col, 'd1["%s"]'%col)
 						try:
 							wcol1 = eval(wcol)
-							if args.verbosity >= 1: print('==== weight="%s" applied to data1' % self.data_weights1[i])
+							if args.verbosity >= 1: print('==== weight="%s" applied to data1' % self.data_weights1[i]))
 							break
 						except:
-							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights1[i], col))
+							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights1[i], col)))
 			if self.data_weights2[i] in ['ones', 'none']:
 				wcol2 = np.ones(len(d2))
 			else:
@@ -842,10 +842,10 @@ class Correlate:
 						wcol = self.data_weights2[i].replace(col, 'd2["%s"]'%col)
 						try:
 							wcol2 = eval(wcol)
-							if args.verbosity >= 1: print('==== weight="%s" applied to data2' % self.data_weights2[i])
+							if args.verbosity >= 1: print('==== weight="%s" applied to data2' % self.data_weights2[i]))
 							break
 						except:
-							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights2[i], col))
+							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights2[i], col)))
 			if self.rand_weights1[i] in ['ones', 'none']:
 				rwcol1 = np.ones(len(r1))
 			else:
@@ -854,10 +854,10 @@ class Correlate:
 						wcol = self.rand_weights1[i].replace(col, 'r1["%s"]'%col)
 						try:
 							rwcol1 = eval(wcol)
-							if args.verbosity >= 1: print('==== weight="%s" applied to rand1' % self.rand_weights1[i])
+							if args.verbosity >= 1: print('==== weight="%s" applied to rand1' % self.rand_weights1[i]))
 							break
 						except:
-							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights1[i], col))
+							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights1[i], col)))
 			if self.rand_weights2[i] in ['ones', 'none']:
 				rwcol2 = np.ones(len(r2))
 			else:
@@ -866,10 +866,10 @@ class Correlate:
 						wcol = self.rand_weights2[i].replace(col, 'r2["%s"]'%col)
 						try:
 							rwcol2 = eval(wcol)
-							if args.verbosity >= 1: print('==== weight="%s" applied to rand2' % self.rand_weights2[i])
+							if args.verbosity >= 1: print('==== weight="%s" applied to rand2' % self.rand_weights2[i]))
 							break
 						except:
-							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights2[i], col))
+							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights2[i], col)))
 
 			# edit .dat suffix if saving down jackknife measurements
 			if run_jackknife:
@@ -920,11 +920,11 @@ class Correlate:
 				try:
 					asc_arr.append(ascii.read(jk))
 				except: # some cuts may not have corresponding jackknife samples
-					print '\n==== %s jackknife missing -- continuing'%jk
+					print('\n==== %s jackknife missing -- continuing'%jk)
 					continue
 			Njk_i = len(asc_arr)
 			if Njk_i == 0 or Njk_i < self.Njk//2:
-				print '\n==== %s jackknife failed -- skipping'%self.outfiles[i]
+				print('\n==== %s jackknife failed -- skipping'%self.outfiles[i])
 				continue
 
 			for col in columns:
@@ -1015,7 +1015,7 @@ if __name__ == '__main__':
 		Corr.collect_jackknife()
 	else:
 		Corr.run_loop(args)
-	print('\n== Done!')
+	print('\n== Done!'))
 
 
 
