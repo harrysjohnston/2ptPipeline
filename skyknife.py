@@ -8,8 +8,6 @@ from astropy.io import fits
 from astropy.table import Table
 import configparser
 from os.path import join, expandvars, basename
-import kmeans_radec
-from kmeans_radec import KMeans, kmeans_sample
 cp = configparser.ConfigParser()
 def betwixt(ra1, ra2, dec1, dec2):
 	def make_cut(cat):
@@ -93,7 +91,7 @@ class Jackknife:
 			stop = False
 			while not stop:
 				groups, stop = self.iterate_quarter_group(groups)
-			print "==== %s (2D) jackknife samples " % len(groups)
+			print("==== %s (2D) jackknife samples " % len(groups))
 
 			if self.do_3d:
 				groups = self.slice_jackknife(groups, zbound=self.zlims)
@@ -133,7 +131,7 @@ class Jackknife:
 			try:
 				self.plot_jackknife()
 			except:
-				print '== %s plotting failed?'%self.catpath
+				print('== %s plotting failed?'%self.catpath)
 
 		return groups
 
@@ -185,7 +183,7 @@ class Jackknife:
 			plt.show()
 
 	def slice_jackknife(self, groups, zbound=None, nbin=None):
-		print '== Attempting to slice samples in redshift..'
+		print('== Attempting to slice samples in redshift..')
 		z = self.cat[self.z_col].copy()
 		r = self.cat[self.r_col].copy()
 
@@ -230,10 +228,10 @@ class Jackknife:
 				final_groups.append(zgroup)
 
 		self.nzbin = nbin
-		print '==== %s slices; %s (3D) jackknife samples' % (nbin, len(final_groups))
-		print '== redshift slice edges: ', np.round(zedge, 3)
-		print '== comoving slice edges: ', np.round(redge, 1)
-		print '== comoving slice depths', np.round(np.diff(redge), 1)
+		print('==== %s slices; %s (3D) jackknife samples' % (nbin, len(final_groups)))
+		print('== redshift slice edges: ', np.round(zedge, 3))
+		print('== comoving slice edges: ', np.round(redge, 1))
+		print('== comoving slice depths', np.round(np.diff(redge), 1))
 		return final_groups
 
 	def define_initial_grouping(self, discont_tol_ra=1., discont_tol_dec=1.):
@@ -288,7 +286,7 @@ class Jackknife:
 		return groups
 
 	def iterate_quarter_group(self, groups):
-		print '== %s groups; attempting to quarter..'%len(groups)
+		print('== %s groups; attempting to quarter..'%len(groups))
 		final_groups = []
 		for group in groups:
 			new_groups = self.quarter_group(group) # will return 1, 2 or 4 group dicts with ~same dims
@@ -302,7 +300,7 @@ class Jackknife:
 				 (ra_scale >= self.sc_tol * self.min_scale_deg) &
 				 (dec_scale >= self.sc_tol * self.min_scale_deg) ):
 				 #(abs(ra_scale - dec_scale) < 0.5*max(ra_scale, dec_scale)) ):
-				#print '%.2f, %.2f, %.2f'%(mean_scale, ra_scale, dec_scale)
+				#print('%.2f, %.2f, %.2f'%(mean_scale, ra_scale, dec_scale))
 				for ng in new_groups:
 					final_groups.append(ng)
 			else:
@@ -372,8 +370,8 @@ class Jackknife:
 						   'gal_dec1':dq[2],
 						   'gal_dec2':dq[3],
 						   'count':len(q),
-						   'wrap':gd['wrap']} for (q, dq) in [(xrange(len(q1)+len(q4)), dims_q14),
-															  (xrange(len(q2)+len(q3)), dims_q23)]]
+						   'wrap':gd['wrap']} for (q, dq) in [(range(len(q1)+len(q4)), dims_q14),
+															  (range(len(q2)+len(q3)), dims_q23)]]
 		elif (not divide_ra) & divide_dec:
 			dims_q12 = dims_q1[0], dims_q2[1], dims_q1[2], dims_q1[3]
 			dims_q34 = dims_q4[0], dims_q3[1], dims_q3[2], dims_q3[3]
@@ -382,8 +380,8 @@ class Jackknife:
 						   'gal_dec1':dq[2],
 						   'gal_dec2':dq[3],
 						   'count':len(q),
-						   'wrap':gd['wrap']} for (q, dq) in [(xrange(len(q1)+len(q2)), dims_q12),
-															  (xrange(len(q3)+len(q4)), dims_q34)]]
+						   'wrap':gd['wrap']} for (q, dq) in [(range(len(q1)+len(q2)), dims_q12),
+															  (range(len(q3)+len(q4)), dims_q34)]]
 		elif (not divide_ra) & (not divide_dec):
 			new_groups = [gd.copy()]
 
@@ -450,7 +448,7 @@ class Jackknife:
 
 		if hasattr(self, 'exports'):
 			for cat in self.exports.keys():
-				print '== exporting jackknife to', cat
+				print('== exporting jackknife to', cat)
 				racol, decol, zcol = self.exports[cat]
 				t1 = Table.read(cat)
 				X2 = np.column_stack((self.mod(t1[racol]), t1[decol]))
@@ -466,11 +464,11 @@ class Jackknife:
 			try:
 				self.plot_jackknife()
 			except:
-				print '== %s plotting failed?'%self.catpath
+				print('== %s plotting failed?'%self.catpath)
 
 	def slice_kmeans(self, jk_labels, zbound=None, nbin=None, zedge=None):
 		if zedge is None:
-			print '== Attempting to slice samples in redshift..'
+			print('== Attempting to slice samples in redshift..')
 		assert len(jk_labels) == len(self.cat), "==== kmeans redshift slicing broken!"
 		z1 = self.cat[self.z_col].copy()
 		r1 = self.cat[self.r_col].copy()
@@ -523,10 +521,10 @@ class Jackknife:
 
 		self.nzbin = nbin
 		if report:
-			print '==== %s slices; %s (3D) jackknife samples' % (nbin, n_jk)
-			print '== redshift slice edges: ', np.round(zedge, 3)
-			print '== comoving slice edges: ', np.round(redge, 1)
-			print '== comoving slice depths', np.round(np.diff(redge), 1)
+			print('==== %s slices; %s (3D) jackknife samples' % (nbin, n_jk))
+			print('== redshift slice edges: ', np.round(zedge, 3))
+			print('== comoving slice edges: ', np.round(redge, 1))
+			print('== comoving slice depths', np.round(np.diff(redge), 1))
 		return jk_labels_sliced, zedge
 
 import argparse
@@ -558,18 +556,22 @@ if __name__ == '__main__':
 	sk = Jackknife(args.config, **kw)
 
 	if args.kmeans != 0:
+		import kmeans_radec
+		from kmeans_radec import KMeans, kmeans_sample
 		sk.kmeans(ncen=args.kmeans)
 	else:
 		rand_groups = sk.create_jackknife()
 		if hasattr(sk, 'exports'):
-			for cat, (ra, dec, z) in sk.exports.iteritems():
-				print '== Exporting to %s..'%cat
+			if hasattr(sk.exports, 'iteritems'): details = sk.exports.iteritems()
+			else: details = sk.exports.items()
+			for cat, (ra, dec, z) in details:
+				print('== Exporting to %s..'%cat)
 				sk_cat = Jackknife(args.config, catpath=cat,
 									ra_col=ra, dec_col=dec, z_col=z)
 				sk_cat.create_jackknife(rand_groups)
 				del sk_cat
 				gc.collect()
-			print '== done!'
+			print('== done!')
 
 
 
