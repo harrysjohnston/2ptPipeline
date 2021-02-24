@@ -604,7 +604,7 @@ class Correlate:
 					if jk_number > max(self.jackknife_numbers):
 						return None
 					else:
-						if args.verbosity >= 1: print('====== SKIP jackknife #%i specified; continuing'%jk_number))
+						if args.verbosity >= 1: print('====== SKIP jackknife #%i specified; continuing'%jk_number)
 						self.run_loop(args, run_jackknife=1, jk_number=jk_number + 1)
 						# break out of loop
 						return None
@@ -674,12 +674,12 @@ class Correlate:
 			try:
 				d1 = fits.open(self.paths_data1[i])[1].data
 			except IOError:
-				print("\n==== %s not found! Skipping.."%self.paths_data1[i]))
+				print("\n==== %s not found! Skipping.."%self.paths_data1[i])
 				continue
 			try:
 				r1 = fits.open(self.paths_rand1[i])[1].data
 			except IOError:
-				print("\n==== %s not found! Skipping.."%self.paths_rand1[i]))
+				print("\n==== %s not found! Skipping.."%self.paths_rand1[i])
 				continue
 
 			if auto:
@@ -697,12 +697,12 @@ class Correlate:
 			# evaluate data/randoms cuts
 			wcols = []
 			for j, (cat, cut) in enumerate(zip(fits_cats, cat_cuts)):
-				if args.verbosity >= 1: print(next(piter)))
+				if args.verbosity >= 1: print(next(piter))
 				cuts = cut[i].split('&')
 				w = np.ones(len(cat), dtype=bool)
 
 				if cuts[0] == 'none':
-					if args.verbosity >= 1: print('==== no cuts!'))
+					if args.verbosity >= 1: print('==== no cuts!')
 				else:
 					# perform ID cut - special cut
 					match_IDs = ['idmatch' in cut for cut in cuts]
@@ -712,7 +712,7 @@ class Correlate:
 						exec "idcut_bool = idmatch(%s, %s, '%s', '%s')" % (c1, c2, id1, id2)
 						if idcut_bool.sum() > 0:
 							w &= idcut_bool
-							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (idcut, (~idcut_bool).sum()*100./len(idcut_bool))))
+							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (idcut, (~idcut_bool).sum()*100./len(idcut_bool)))
 						else:
 							print('====== Error: ID matching failed! Skipping..')
 						del cuts[cuts.index(idcut)]
@@ -725,7 +725,7 @@ class Correlate:
 						dscut_bool = np.random.rand(len(w)) <= float(custom_frac)
 						if dscut_bool.sum() > 0:
 							w &= dscut_bool
-							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (dscut, (~dscut_bool).sum()*100./len(dscut_bool))))
+							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (dscut, (~dscut_bool).sum()*100./len(dscut_bool)))
 						else:
 							print('====== Error: custom downsampling failed! Skipping..')
 						del cuts[cuts.index(dscut)]
@@ -738,9 +738,9 @@ class Correlate:
 									colcut = eval(crepl) # and construct the boolean array
 									w &= colcut
 									lencol = float(len(colcut))
-									if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (c, (~colcut).sum()*100./lencol)))
+									if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (c, (~colcut).sum()*100./lencol))
 								except:
-									if args.verbosity >= 2: print('==== cut="%s" mismatched to column="%s" -- no action' % (c, col)))
+									if args.verbosity >= 2: print('==== cut="%s" mismatched to column="%s" -- no action' % (c, col))
 
 				zero_jk_cut = False
 				if run_jackknife: # if doing jackknife, remove jackknife_ID == jk_number; will loop over all jk_numbers
@@ -760,11 +760,11 @@ class Correlate:
 						zero_jk_cut = True
 
 					if args.verbosity >= 1:
-						print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, self.Njk, (~wj).sum()*100./len(wj))))
+						print('==== jackknife #%s / %s excluded for %.1f%% losses'%(jk_number, self.Njk, (~wj).sum()*100./len(wj)))
 
 				# update the samples
 				fits_cats[j] = fits_cats[j][w]
-				if args.verbosity >= 1: print('==== total loss: %.1f%%' % ((~w).sum()*100./len(w))))
+				if args.verbosity >= 1: print('==== total loss: %.1f%%' % ((~w).sum()*100./len(w)))
 				if auto:
 					d1 = fits_cats[0]
 					d2 = d1
@@ -782,18 +782,18 @@ class Correlate:
 
 			# downsample excess randoms to factor <args.down> more than the data
 			if args.down != 0:
-				if args.verbosity >= 1: print('== Downsampling randoms..'))
+				if args.verbosity >= 1: print('== Downsampling randoms..')
 			if args.down == 0:
-				if args.verbosity >= 2: print('== No downsampling of randoms!'))
+				if args.verbosity >= 2: print('== No downsampling of randoms!')
 			elif len(r1) > args.down*(len(d1)):
 				r1 = ds_func(d1, r1, target=args.down)
-				if args.verbosity >= 2: print('==== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)')
+				if args.verbosity >= 2: print('==== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)'
 						% (basename(self.paths_rand1[i]), len(r1), float(len(r1))/len(d1), basename(self.paths_data1[i]), len(d1)))
 
 			if not auto:
 				if len(r2) > args.down*(len(d2)) and args.down != 0:
 					r2 = ds_func(d2, r2, target=args.down)
-					if args.verbosity >= 2: print('==== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)')
+					if args.verbosity >= 2: print('==== Downsampled %s (%i) to %.fx num. of %s galaxies (%i)'
 							% (basename(self.paths_rand2[i]), len(r2), float(len(r2))/len(d2), basename(self.paths_data2[i]), len(d2)))
 			else:
 				d2 = d1
@@ -830,10 +830,10 @@ class Correlate:
 						wcol = self.data_weights1[i].replace(col, 'd1["%s"]'%col)
 						try:
 							wcol1 = eval(wcol)
-							if args.verbosity >= 1: print('==== weight="%s" applied to data1' % self.data_weights1[i]))
+							if args.verbosity >= 1: print('==== weight="%s" applied to data1' % self.data_weights1[i])
 							break
 						except:
-							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights1[i], col)))
+							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights1[i], col))
 			if self.data_weights2[i] in ['ones', 'none']:
 				wcol2 = np.ones(len(d2))
 			else:
@@ -842,10 +842,10 @@ class Correlate:
 						wcol = self.data_weights2[i].replace(col, 'd2["%s"]'%col)
 						try:
 							wcol2 = eval(wcol)
-							if args.verbosity >= 1: print('==== weight="%s" applied to data2' % self.data_weights2[i]))
+							if args.verbosity >= 1: print('==== weight="%s" applied to data2' % self.data_weights2[i])
 							break
 						except:
-							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights2[i], col)))
+							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights2[i], col))
 			if self.rand_weights1[i] in ['ones', 'none']:
 				rwcol1 = np.ones(len(r1))
 			else:
@@ -854,10 +854,10 @@ class Correlate:
 						wcol = self.rand_weights1[i].replace(col, 'r1["%s"]'%col)
 						try:
 							rwcol1 = eval(wcol)
-							if args.verbosity >= 1: print('==== weight="%s" applied to rand1' % self.rand_weights1[i]))
+							if args.verbosity >= 1: print('==== weight="%s" applied to rand1' % self.rand_weights1[i])
 							break
 						except:
-							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights1[i], col)))
+							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights1[i], col))
 			if self.rand_weights2[i] in ['ones', 'none']:
 				rwcol2 = np.ones(len(r2))
 			else:
@@ -866,10 +866,10 @@ class Correlate:
 						wcol = self.rand_weights2[i].replace(col, 'r2["%s"]'%col)
 						try:
 							rwcol2 = eval(wcol)
-							if args.verbosity >= 1: print('==== weight="%s" applied to rand2' % self.rand_weights2[i]))
+							if args.verbosity >= 1: print('==== weight="%s" applied to rand2' % self.rand_weights2[i])
 							break
 						except:
-							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights2[i], col)))
+							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights2[i], col))
 
 			# edit .dat suffix if saving down jackknife measurements
 			if run_jackknife:
@@ -1015,7 +1015,7 @@ if __name__ == '__main__':
 		Corr.collect_jackknife()
 	else:
 		Corr.run_loop(args)
-	print('\n== Done!'))
+	print('\n== Done!')
 
 
 
