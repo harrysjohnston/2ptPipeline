@@ -1,6 +1,12 @@
 print("\n2-point correlation pipeline -- Harry Johnston 2019")
 print("Work in progress!")
-print("hj@star.ucl.ac.uk\n")
+print("Notes:")
+print("meanr and meanlogr in outputs are not accurate,")
+print("as they take the pair-weighted average of meanr over the Pi-axis,")
+print("i.e. the mean of a mean -- use only as instructive, and beware")
+print("especially in case of weighted correlations. Also, shot/shape-noise errors")
+print("require further testing, so do not trust these implicitly.")
+print("h.s.johnston@uu.nl\n")
 import os
 import gc
 import pickle
@@ -11,9 +17,6 @@ import numpy as np
 import configparser
 from os import mkdir, makedirs
 from tqdm import tqdm
-#from memory_profiler import profile, LogFile
-#import sys
-#sys.stdout = LogFile('/share/splinter/hj/PhD/KiDS_PhotometricClustering/memory_profile.log')
 from os.path import isdir, join, expandvars, basename, dirname
 from astropy.io import fits, ascii
 from astropy.table import Table
@@ -356,8 +359,11 @@ class Correlate:
 		gt_3D = np.zeros([self.nbins_rpar, self.nbins])
 		gx_3D = np.zeros([self.nbins_rpar, self.nbins])
 		varg_3D = np.zeros([self.nbins_rpar, self.nbins])
+		DD_3D = np.zeros([self.nbins_rpar, self.nbins])
 		DS_3D = np.zeros([self.nbins_rpar, self.nbins])
 		RS_3D = np.zeros([self.nbins_rpar, self.nbins])
+		meanr_3D = np.zeros([self.nbins_rpar, self.nbins])
+		meanlogr_3D = np.zeros([self.nbins_rpar, self.nbins])
 
 		data1 = treecorr.Catalog(ra=d1[self.ra_col_proj], dec=d1[self.dec_col_proj], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1,
 								 r=d1[self.r_col])#, g1=d1[self.g1_col] * self.fg1, g2=d1[self.g2_col] * self.fg2)
@@ -431,8 +437,11 @@ class Correlate:
 				gt_3D[p] += ng.xi / norm1
 				gx_3D[p] += ng.xi_im / norm1
 				varg_3D[p] += ng.varxi / norm1
+			DD_3D[p] += ng.npairs
 			DS_3D[p] += ng.weight
 			RS_3D[p] += rg.weight
+			meanr_3D[p] += ng.meanr
+			meanlogr_3D[p] += ng.meanlogr
 
 		# compute/save projected statistics
 		if self.rpar_edges is None:
@@ -444,7 +453,9 @@ class Correlate:
 		varg = np.sum(varg_3D, axis=0)
 		DS = np.sum(DS_3D, axis=0)
 		RS = np.sum(RS_3D, axis=0)
-		r = np.column_stack((ng.rnom, ng.meanr, ng.meanlogr))
+		meanr = np.average(meanr_3D, axis=0, weights=DD_3D)
+		meanlogr = np.average(meanlogr_3D, axis=0, weights=DD_3D)
+		r = np.column_stack((ng.rnom, meanr, meanlogr))
 		output = np.column_stack((r, gt, gx, varg**0.5, DS, RS))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgplus','wgcross','noise','DSpairs','RSpairs')))
 
@@ -458,7 +469,7 @@ class Correlate:
 				DSntot -= data2.ntot
 			RSntot = rand1.ntot * data2.ntot
 
-			output_dict = {'r':r,'Pi':Pi,'w3d':gt_3D,'wx3d':gx_3D,'noise3d':varg_3D**0.5,'DS_3d':DS_3D,'RS_3d':RS_3D,
+			output_dict = {'r':r,'meanr':meanr_3D,'meanlogr':meanlogr_3D,'Pi':Pi,'w3d':gt_3D,'wx3d':gx_3D,'noise3d':varg_3D**0.5,'DS_3d':DS_3D,'RS_3d':RS_3D,'DD_3d':DD_3D,
 							'DSntot':DSntot,'RSntot':RSntot}
 			if outfile.endswith('.dat'):
 				outfile3d = outfile.replace('.dat', '.p')
@@ -487,6 +498,8 @@ class Correlate:
 		DR_3D = np.zeros([self.nbins_rpar, self.nbins])
 		RD_3D = np.zeros([self.nbins_rpar, self.nbins])
 		RR_3D = np.zeros([self.nbins_rpar, self.nbins])
+		meanr_3D = np.zeros([self.nbins_rpar, self.nbins])
+		meanlogr_3D = np.zeros([self.nbins_rpar, self.nbins])
 
 		data1 = treecorr.Catalog(ra=d1[self.ra_col_proj], dec=d1[self.dec_col_proj], r=d1[self.r_col], w=wcol1,
 								 ra_units=self.ra_units, dec_units=self.dec_units)
@@ -546,6 +559,8 @@ class Correlate:
 			else:
 				RD_3D[p] += rn.weight
 			RR_3D[p] += rr.weight
+			meanr_3D[p] += nn.meanr
+			meanlogr_3D[p] += nn.meanlogr
 
 		# compute/save projected statistics
 		if self.rpar_edges is None:
@@ -557,7 +572,9 @@ class Correlate:
 		DRpair = np.sum(DR_3D, axis=0)
 		RDpair = np.sum(RD_3D, axis=0)
 		RRpair = np.sum(RR_3D, axis=0)
-		r = np.column_stack((nn.rnom, nn.meanr, nn.meanlogr))
+		meanr = np.average(meanr_3D, axis=0, weights=DD_3D)
+		meanlogr = np.average(meanlogr_3D, axis=0, weights=DD_3D)
+		r = np.column_stack((nn.rnom, meanr, meanlogr))
 		output = np.column_stack((r, wgg, varw**0.5, DDpair, DRpair, RDpair, RRpair))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgg','noise','DDpairs','DRpairs','RDpairs','RRpairs')))
 
@@ -576,7 +593,7 @@ class Correlate:
 				DRntot = data1.ntot * rand2.ntot
 				RDntot = rand1.ntot * data2.ntot
 
-			output_dict = {'r':r,'Pi':Pi,'w3d':wgg_3D,'noise3d':varw_3D**0.5,
+			output_dict = {'r':r,'meanr':meanr_3D,'meanlogr':meanlogr_3D,'Pi':Pi,'w3d':wgg_3D,'noise3d':varw_3D**0.5,
 						   'DD3d':DD_3D,'DR3d':DR_3D,'RD3d':RD_3D,'RR3d':RR_3D,
 						   'DDntot':DDntot,'DRntot':DRntot,'RDntot':RDntot,'RRntot':RRntot}
 			if outfile.endswith('.dat'):
