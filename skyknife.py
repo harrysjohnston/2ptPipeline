@@ -442,8 +442,12 @@ class Jackknife:
 		km = kmeans_sample(X, ncen, maxiter=100, tol=1.0e-5, nsample=len(X))
 		jk_labels = km.labels + 1
 		if self.do_3d:
-			jk_labels, zedge = self.slice_kmeans(jk_labels, zbound=self.zlims)
-		t = Table(randoms)
+			jk_labels, zedge = self.slice_kmeans(jk_labels, self.cat, self.z_col, zbound=self.zlims)
+			rand_z, rand_r = self.cat[self.z_col], self.cat[self.r_col]
+			zsort = np.argsort(rand_z)
+			rand_z, rand_r = rand_z[zsort], rand_r[zsort]
+			self.comoving = lambda z: np.interp(z, rand_z, rand_r)
+		t = Table(self.cat)
 		t['jackknife_ID'] = jk_labels
 		t.write(self.catpath, overwrite=1)
 
@@ -455,7 +459,7 @@ class Jackknife:
 				X2 = np.column_stack((self.mod(t1[racol]), t1[decol]))
 				jk_labels2 = km.find_nearest(X2) + 1
 				if self.do_3d:
-					jk_labels2, zedge = self.slice_kmeans(jk_labels2, zbound=self.zlims, zedge=zedge)
+					jk_labels2, zedge = self.slice_kmeans(jk_labels2, t1, zcol, zbound=self.zlims, zedge=zedge)
 				t1['jackknife_ID'] = jk_labels2
 				t1.write(cat, overwrite=1)
 				del X2, t1
@@ -467,12 +471,16 @@ class Jackknife:
 			except:
 				print('== %s plotting failed?'%self.catpath)
 
-	def slice_kmeans(self, jk_labels, zbound=None, nbin=None, zedge=None):
+	def slice_kmeans(self, jk_labels, cat, z_col, zbound=None, nbin=None, zedge=None):
 		if zedge is None:
 			print('== Attempting to slice samples in redshift..')
-		assert len(jk_labels) == len(self.cat), "==== kmeans redshift slicing broken!"
-		z1 = self.cat[self.z_col].copy()
-		r1 = self.cat[self.r_col].copy()
+		assert len(jk_labels) == len(cat), "==== kmeans redshift slicing broken!"
+		if cat is self.cat:
+			z1 = self.cat[self.z_col].copy()
+			r1 = self.cat[self.r_col].copy()
+		else:
+			z1 = cat[z_col].copy()
+			r1 = self.comoving(z1)
 
 		if zbound is None:
 			zmin, zmax = np.percentile(z, [0.5, 99.5])
