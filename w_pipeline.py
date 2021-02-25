@@ -415,7 +415,11 @@ class Correlate:
 			if self.estimator == 'PW2': # RRs (rr) norm
 				rr = treecorr.NNCorrelation(conf_pi)
 				rr.process_cross(rand1, rand2)
-				rr.finalize()
+				#rr.finalize()
+				set_r1_ra = set(r1[self.rand_ra_col_proj])
+				set_r2_ra = set(r2[self.rand_ra_col_proj])
+				intersection = set_r1_ra.intersection(set_r2_ra)
+				setattr(rr, 'tot', 1.*rand1.ntot*rand2.ntot)
 				rrw = ng.tot / rr.tot
 				rrgw = rg.tot / rr.tot
 				#norm1 = (rr.weight * rrw) / ng.weight
