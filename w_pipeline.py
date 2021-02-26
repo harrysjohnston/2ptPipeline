@@ -1,11 +1,12 @@
 print("\n2-point correlation pipeline -- Harry Johnston 2019")
 print("Work in progress!")
-print("Notes:")
+print("\nNotes:")
 print("meanr and meanlogr in outputs are not accurate,")
 print("as they take the pair-weighted average of meanr over the Pi-axis,")
 print("i.e. the mean of a mean -- use only as instructive, and beware")
-print("especially in case of weighted correlations. Also, shot/shape-noise errors")
-print("require further testing, so do not trust these implicitly.")
+print("especially in case of weighted correlations.")
+print("Also, shot/shape-noise errors require further testing,")
+print("so do not trust these implicitly.")
 print("h.s.johnston@uu.nl\n")
 import os
 import gc
@@ -373,15 +374,41 @@ class Correlate:
 								 r=r1[self.rand_r_col], is_rand=1, w=rwcol1)
 		rand2 = treecorr.Catalog(ra=r2[self.rand_ra_col_proj], dec=r2[self.rand_dec_col_proj], ra_units=self.ra_units, dec_units=self.dec_units,
 								 r=r2[self.rand_r_col], is_rand=1, w=rwcol2)
-
-		# deprecated normalisation step
-		#f1 = data1.ntot * self.random_oversampling / float(rand1.ntot)
-		#f2 = data2.ntot * self.random_oversampling / float(rand2.ntot)
-		#rand1.w = np.array(np.random.rand(rand1.ntot) < f1, dtype=float)
-		#rand2.w = np.array(np.random.rand(rand2.ntot) < f2, dtype=float)
 		varg = treecorr.calculateVarG(data2)
 
+
+		# find duplicate objects between d1/2 and r1/2
+		set_d1_ra = set(d1[self.ra_col_proj][wcol1!=0])
+		set_d2_ra = set(d2[self.ra_col_proj][wcol2!=0])
+		data_ind_dict_1 = dict((k,i) for i,k in enumerate(d1[self.ra_col_proj][wcol1!=0]))
+		data_ind_dict_2 = dict((k,i) for i,k in enumerate(d2[self.ra_col_proj][wcol2!=0]))
+		data_intersection = set_d1_ra.intersection(set_d2_ra)
+		data_int_ind_1 = [data_ind_dict_1[x] for x in data_intersection]
+		data_int_ind_2 = [data_ind_dict_2[x] for x in data_intersection]
+		data_int_w1 = wcol1[wcol1!=0][data_int_ind_1]
+		data_int_w2 = wcol2[wcol2!=0][data_int_ind_2]
+
+		set_r1_ra = set(r1[self.rand_ra_col_proj][rwcol1!=0])
+		set_r2_ra = set(r2[self.rand_ra_col_proj][rwcol2!=0])
+		rand_ind_dict_1 = dict((k,i) for i,k in enumerate(r1[self.rand_ra_col_proj][rwcol1!=0]))
+		rand_ind_dict_2 = dict((k,i) for i,k in enumerate(r2[self.rand_ra_col_proj][rwcol2!=0]))
+		rand_intersection = set_r1_ra.intersection(set_r2_ra)
+		rand_int_ind_1 = [rand_ind_dict_1[x] for x in rand_intersection]
+		rand_int_ind_2 = [rand_ind_dict_2[x] for x in rand_intersection]
+		rand_int_w1 = rwcol1[rwcol1!=0][rand_int_ind_1]
+		rand_int_w2 = rwcol2[rwcol2!=0][rand_int_ind_2]
+
+		# get pair-normalisation factors
+		ng_tot = 1.*data1.sumw*data2.sumw - np.sum(data_int_w1*data_int_w2)
+		rr_tot = 1.*rand1.sumw*rand2.sumw - np.sum(rand_int_w1*rand_int_w2)
+		rg_tot = 1.*rand1.sumw*data2.sumw
+		rgw = ng_tot / rg_tot
+		rrw = ng_tot / rr_tot
+		rrgw = rg_tot / rr_tot
+
+		# loop over Pi-bins collecting w(rp, Pi[p])
 		for p in range(self.nbins_rpar):
+			print('== Pi bin #%s'%(p+1))
 			if self.largePi and any(abs(Pi[p:p+2]) < self.max_rpar): # skip any |Pi| < max_arg
 				continue
 
@@ -396,39 +423,17 @@ class Correlate:
 			rg.process_cross(rand1, data2)
 			ng.varxi = varg
 			ng.varxi = varg
-			#ng.finalize(varg)
-			#rg.finalize(varg)
-
-			set_d1_ra = set(d1[self.ra_col_proj])
-			set_d2_ra = set(d2[self.ra_col_proj])
-			intersection = set_d1_ra.intersection(set_d2_ra)
-			setattr(ng, 'tot', 1.*data1.ntot*data2.ntot - len(intersection))
-			setattr(rg, 'tot', 1.*rand1.ntot*data2.ntot)
-			rgw = ng.tot / rg.tot
 
 			# calculate appropriate normalisation of terms for chosen estimator
 			if self.estimator == 'PW1': # RDs (rg) norm
-				#norm1 = (rg.weight * rgw) / ng.weight
-				#norm2 = rgw
 				norm1 = rg.weight * rgw
 				norm2 = rg.weight
 			if self.estimator == 'PW2': # RRs (rr) norm
 				rr = treecorr.NNCorrelation(conf_pi)
 				rr.process_cross(rand1, rand2)
-				#rr.finalize()
-				set_r1_ra = set(r1[self.rand_ra_col_proj])
-				set_r2_ra = set(r2[self.rand_ra_col_proj])
-				intersection = set_r1_ra.intersection(set_r2_ra)
-				setattr(rr, 'tot', 1.*rand1.ntot*rand2.ntot)
-				rrw = ng.tot / rr.tot
-				rrgw = rg.tot / rr.tot
-				#norm1 = (rr.weight * rrw) / ng.weight
-				#norm2 = (rr.weight * rrw) / (rg.weight * rgw)
 				norm1 = rr.weight * rrw
 				norm2 = rr.weight * rrgw
-			elif self.estimator == 'AS': # DDs (ng), RDs (rg) norms, done by .finalize()
-				#norm1 = 1.
-				#norm2 = rgw
+			elif self.estimator == 'AS': # DDs (ng), RDs (rg) norms
 				norm1 = ng.weight
 				norm2 = rg.weight
 
@@ -515,7 +520,9 @@ class Correlate:
 			rand2 = treecorr.Catalog(ra=r2[self.rand_ra_col_proj], dec=r2[self.rand_dec_col_proj], r=r2[self.rand_r_col], is_rand=1, w=rwcol2,
 									 ra_units=self.ra_units, dec_units=self.dec_units)
 
+		# loop over Pi-bins collecting w(rp, Pi[p])
 		for p in range(self.nbins_rpar):
+			print('== Pi bin #%s'%(p+1))
 			if self.largePi and any(abs(Pi[p:p+2]) < self.max_rpar): # skip any |Pi| < max_arg
 				continue
 
