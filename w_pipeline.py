@@ -106,17 +106,30 @@ class Correlate:
 		# if not providing different catalogues/cuts/weights for cross-correlation,
 		# copy arguments for auto-correlations
 		if data_cuts1 in [[''], []]:
-			if args.verbosity >= 1: print('== No sample cuts (data_cuts) specified; none')
+			if args.verbosity >= 1: print('== No sample(1) cuts (data_cuts1) specified; none')
 			data_cuts1 = ['none'] * len(paths_data1)
 		if rand_cuts1 in [[''], []]:
-			if args.verbosity >= 1: print('== No randoms cuts (rand_cuts) specified; none')
+			if args.verbosity >= 1: print('== No randoms(1) cuts (rand_cuts1) specified; none')
 			rand_cuts1 = ['none'] * len(paths_rand1)
 		if data_weights1 in [[''], []]:
-			if args.verbosity >= 1: print('== Galaxy weighting (data_weights) not set; assuming unity weights for all')
+			if args.verbosity >= 1: print('== Galaxy(1) weighting (data_weights1) not set; assuming unit weights for all')
 			data_weights1 = ['ones'] * len(paths_data1)
 		if rand_weights1 in [[''], []]:
-			if args.verbosity >= 1: print('== Randoms weighting (rand_weights) not set; assuming unity weights for all')
+			if args.verbosity >= 1: print('== Randoms(1) weighting (rand_weights1) not set; assuming unit weights for all')
 			rand_weights1 = ['ones'] * len(paths_data1)
+		if data_cuts2 in [[''], []]:
+			if args.verbosity >= 1: print('== No sample(2) cuts (data_cuts2) specified; none')
+			data_cuts2 = ['none'] * len(paths_data2)
+		if rand_cuts2 in [[''], []]:
+			if args.verbosity >= 1: print('== No randoms(2) cuts (rand_cuts2) specified; none')
+			rand_cuts2 = ['none'] * len(paths_rand2)
+		if data_weights2 in [[''], []]:
+			if args.verbosity >= 1: print('== Galaxy(2) weighting (data_weights2) not set; assuming unit weights for all')
+			data_weights2 = ['ones'] * len(paths_data2)
+		if rand_weights2 in [[''], []]:
+			if args.verbosity >= 1: print('== Randoms(2) weighting (rand_weights2) not set; assuming unit weights for all')
+			rand_weights2 = ['ones'] * len(paths_data2)
+
 		if corr_types in [[''], []]:
 			print('== Correlation types (corr_types) not set; assuming angular clustering for all')
 			corr_types = ['wth'] * len(paths_data1)
@@ -398,7 +411,7 @@ class Correlate:
 		rand_int_w1 = rwcol1[rwcol1!=0][rand_int_ind_1]
 		rand_int_w2 = rwcol2[rwcol2!=0][rand_int_ind_2]
 
-		# get pair-normalisation factors
+		# get pair-normalisation factors = total sum of (non-duplicate) weighted pairs with unlimited separation
 		ng_tot = 1.*data1.sumw*data2.sumw - np.sum(data_int_w1*data_int_w2)
 		rr_tot = 1.*rand1.sumw*rand2.sumw - np.sum(rand_int_w1*rand_int_w2)
 		rg_tot = 1.*rand1.sumw*data2.sumw
@@ -737,7 +750,7 @@ class Correlate:
 					if any(match_IDs):
 						idcut = np.array(cuts)[match_IDs][0]
 						c1, c2, id1, id2 = idcut.replace(' ','').replace('idmatch','').replace('(','').replace(')','').split(',')
-						exec("idcut_bool = idmatch(%s, %s, '%s', '%s')" % (c1, c2, id1, id2))
+						idcut_bool = eval("idmatch(%s, %s, '%s', '%s')" % (c1, c2, id1, id2))
 						if idcut_bool.sum() > 0:
 							w &= idcut_bool
 							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (idcut, (~idcut_bool).sum()*100./len(idcut_bool)))
@@ -850,7 +863,7 @@ class Correlate:
 				gc.collect()
 
 			# determine galaxy weighting in similar fashion to evaluation of cuts above
-			if self.data_weights1[i] in ['ones', 'none']:
+			if self.data_weights1[i] in ['ones', 'none', '']:
 				wcol1 = np.ones(len(d1))
 			else:
 				for col in np.sort(d1.columns.names):
@@ -862,7 +875,7 @@ class Correlate:
 							break
 						except:
 							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights1[i], col))
-			if self.data_weights2[i] in ['ones', 'none']:
+			if self.data_weights2[i] in ['ones', 'none', '']:
 				wcol2 = np.ones(len(d2))
 			else:
 				for col in np.sort(d2.columns.names):
@@ -874,7 +887,7 @@ class Correlate:
 							break
 						except:
 							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights2[i], col))
-			if self.rand_weights1[i] in ['ones', 'none']:
+			if self.rand_weights1[i] in ['ones', 'none', '']:
 				rwcol1 = np.ones(len(r1))
 			else:
 				for col in np.sort(r1.columns.names):
@@ -886,7 +899,7 @@ class Correlate:
 							break
 						except:
 							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights1[i], col))
-			if self.rand_weights2[i] in ['ones', 'none']:
+			if self.rand_weights2[i] in ['ones', 'none', '']:
 				rwcol2 = np.ones(len(r2))
 			else:
 				for col in np.sort(r2.columns.names):
