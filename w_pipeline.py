@@ -69,7 +69,8 @@ class Correlate:
 			print('== Overriding config arguments from command line:')
 			for ap in args.p:
 				s = ap.split('.')[0]
-				p, v = ap.replace(s, '')[1:].split('=')
+				p = ap.split('.')[1].split('=')[0]
+				v = ap.split('=')[1]
 				if args.verbosity >= 1:
 					print('==== %s.%s:->%s'%(s, p, v))
 				cp.set(s, p, value=v)
