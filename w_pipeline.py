@@ -1,10 +1,7 @@
 print("\n2-point correlation pipeline -- Harry Johnston 2019")
 print("Work in progress!")
 print("\nNotes:")
-print("meanr and meanlogr in outputs are not accurate,")
-print("as they take the pair-weighted average of meanr over the Pi-axis,")
-print("i.e. the mean of a mean -- use only as instructive, and beware")
-print("especially in case of weighted correlations.")
+print("meanr and meanlogr in outputs are preliminary and untested (30/04/21)")
 print("Also, shot/shape-noise errors require further testing,")
 print("so do not trust these implicitly.")
 print("h.s.johnston@uu.nl\n")
@@ -463,8 +460,8 @@ class Correlate:
 			DD_3D[p] += ng.npairs
 			DS_3D[p] += ng.weight
 			RS_3D[p] += rg.weight
-			meanr_3D[p] += ng.meanr
-			meanlogr_3D[p] += ng.meanlogr
+			meanr_3D[p] += ng.meanr * ng.weight
+			meanlogr_3D[p] += ng.meanlogr * ng.weight
 
 		# compute/save projected statistics
 		if self.rpar_edges is None:
@@ -476,8 +473,8 @@ class Correlate:
 		varg = np.sum(varg_3D, axis=0)
 		DS = np.sum(DS_3D, axis=0)
 		RS = np.sum(RS_3D, axis=0)
-		meanr = np.average(meanr_3D, axis=0, weights=DD_3D)
-		meanlogr = np.average(meanlogr_3D, axis=0, weights=DD_3D)
+		meanr = np.sum(meanr_3D, axis=0) / DS
+		meanlogr = np.sum(meanlogr_3D, axis=0) / DS
 		r = np.column_stack((ng.rnom, meanr, meanlogr))
 		output = np.column_stack((r, gt, gx, varg**0.5, DS, RS))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgplus','wgcross','noise','DSpairs','RSpairs')))
@@ -492,8 +489,10 @@ class Correlate:
 				DSntot -= data2.ntot
 			RSntot = rand1.ntot * data2.ntot
 
-			output_dict = {'r':r,'meanr':meanr_3D,'meanlogr':meanlogr_3D,'Pi':Pi,'w3d':gt_3D,'wx3d':gx_3D,'noise3d':varg_3D**0.5,'DS_3d':DS_3D,'RS_3d':RS_3D,'DD_3d':DD_3D,
-							'DSntot':DSntot,'RSntot':RSntot}
+			output_dict = {'r':r,'meanr':meanr_3D,'meanlogr':meanlogr_3D,
+						   'Pi':Pi,'w3d':gt_3D,'wx3d':gx_3D,'noise3d':varg_3D**0.5,
+						   'DS_3d':DS_3D,'RS_3d':RS_3D,'DD_3d':DD_3D,
+						   'DSntot':DSntot,'RSntot':RSntot}
 			if outfile.endswith('.dat'):
 				outfile3d = outfile.replace('.dat', '.p')
 			elif '.jk' in outfile:
@@ -584,8 +583,8 @@ class Correlate:
 			else:
 				RD_3D[p] += rn.weight
 			RR_3D[p] += rr.weight
-			meanr_3D[p] += nn.meanr
-			meanlogr_3D[p] += nn.meanlogr
+			meanr_3D[p] += nn.meanr * nn.weight
+			meanlogr_3D[p] += nn.meanlogr * nn.weight
 
 		# compute/save projected statistics
 		if self.rpar_edges is None:
@@ -597,8 +596,8 @@ class Correlate:
 		DRpair = np.sum(DR_3D, axis=0)
 		RDpair = np.sum(RD_3D, axis=0)
 		RRpair = np.sum(RR_3D, axis=0)
-		meanr = np.average(meanr_3D, axis=0, weights=DD_3D)
-		meanlogr = np.average(meanlogr_3D, axis=0, weights=DD_3D)
+		meanr = np.sum(meanr_3D, axis=0) / DDpair
+		meanlogr = np.sum(meanlogr_3D, axis=0) / DDpair
 		r = np.column_stack((nn.rnom, meanr, meanlogr))
 		output = np.column_stack((r, wgg, varw**0.5, DDpair, DRpair, RDpair, RRpair))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgg','noise','DDpairs','DRpairs','RDpairs','RRpairs')))
@@ -618,7 +617,8 @@ class Correlate:
 				DRntot = data1.ntot * rand2.ntot
 				RDntot = rand1.ntot * data2.ntot
 
-			output_dict = {'r':r,'meanr':meanr_3D,'meanlogr':meanlogr_3D,'Pi':Pi,'w3d':wgg_3D,'noise3d':varw_3D**0.5,
+			output_dict = {'r':r,'meanr':meanr_3D,'meanlogr':meanlogr_3D,
+						   'Pi':Pi,'w3d':wgg_3D,'noise3d':varw_3D**0.5,
 						   'DD3d':DD_3D,'DR3d':DR_3D,'RD3d':RD_3D,'RR3d':RR_3D,
 						   'DDntot':DDntot,'DRntot':DRntot,'RDntot':RDntot,'RRntot':RRntot}
 			if outfile.endswith('.dat'):
@@ -666,30 +666,6 @@ class Correlate:
 				auto = False
 			else:
 				auto = True
-
-		#	if self.build_jackknife:
-		#		# build jackknife with uniform randoms
-		#		# use randoms jackknife to create galaxy jackknife
-		#		# NEEDS DEBUG
-		#		if self.corr_types[i] in ['wgp', 'wgg']:
-		#			rrcol = self.rand_ra_col_proj
-		#			rdcol = self.rand_dec_col_proj
-		#			rzcol = self.rand_r_col
-		#			zcol = self.r_col
-		#		else:
-		#			rrcol = self.ra_col
-		#			rdcol = self.dec_col
-		#			rzcol = None
-		#			zcol = None
-		#		rand_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_rand1[i], ra_col=rrcol, dec_col=rdcol, z_col=rzcol)
-		#		data_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_data1[i], ra_col=self.ra_col, dec_col=self.dec_col, z_col=zcol)
-		#		rand_groups = rand_sk.create_jackknife()
-		#		data_groups = data_sk.create_jackknife(rand_groups)
-		#		if not auto:
-		#			rand2_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_rand2[i], ra_col=rrcol, dec_col=rdcol, z_col=rzcol)
-		#			data2_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_data2[i], ra_col=self.ra_col, dec_col=self.dec_col, z_col=zcol)
-		#			rand2_groups = rand2_sk.create_jackknife(rand_groups)
-		#			data2_groups = data2_sk.create_jackknife(rand_groups)
 
 			if args.verbosity >= 1: print('\n== Auto-correlation = ', auto)
 			if args.verbosity >= 1:
@@ -1061,25 +1037,3 @@ if __name__ == '__main__':
 
 
 
-
-
-
-
-
-
-
-#		if args.remask_randoms:
-#			#import healpy as hp
-#			#nside = 2048
-#			#npix = hp.nside2npix(nside)
-#			#gpid = hp.ang2pix(nside, d1[ra_col], d1[dec_col], lonlat=True)
-#			#rpid = hp.ang2pix(nside, r1[ra_col], r1[dec_col], lonlat=True)
-#			#gmap = np.bincount(gpid, minlength=npix)
-#			#pixcut = np.where(gmap[rpid] == 0, False, True)
-#			#r1 = r1[pixcut]
-#			#if not auto:
-#			#	gpid = hp.ang2pix(nside, d2[ra_col], d2[dec_col], lonlat=True)
-#			#	rpid = hp.ang2pix(nside, r2[ra_col], r2[dec_col], lonlat=True)
-#			#	gmap = np.bincount(gpid, minlength=npix)
-#			#	pixcut = np.where(gmap[rpid] == 0, False, True)
-#			#	r2 = r2[pixcut]
