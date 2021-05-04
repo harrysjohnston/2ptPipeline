@@ -460,8 +460,8 @@ class Correlate:
 			DD_3D[p] += ng.npairs
 			DS_3D[p] += ng.weight
 			RS_3D[p] += rg.weight
-			meanr_3D[p] += ng.meanr * ng.weight
-			meanlogr_3D[p] += ng.meanlogr * ng.weight
+			meanr_3D[p] += ng.meanr
+			meanlogr_3D[p] += ng.meanlogr
 
 		# compute/save projected statistics
 		if self.rpar_edges is None:
