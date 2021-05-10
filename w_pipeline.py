@@ -101,8 +101,7 @@ class Correlate:
 			map(lambda x: [i for i in x if i != ''], [data_cuts1, data_cuts2, rand_cuts1, rand_cuts2, data_weights1, data_weights2, rand_weights1, rand_weights2])
 		corr_types = [i for i in corr_types if i != '']
 
-		# if not providing different catalogues/cuts/weights for cross-correlation,
-		# copy arguments for auto-correlations
+		# replace empty arguments with 'none' for cuts, or 'ones' for weights
 		if data_cuts1 in [[''], []]:
 			if args.verbosity >= 1: print('== No sample(1) cuts (data_cuts1) specified; none')
 			data_cuts1 = ['none'] * len(paths_data1)
@@ -135,21 +134,15 @@ class Correlate:
 			if corr_types[-1] == '': corr_types = corr_types[:-1]
 			assert all([ct in ['wth', 'wgp', 'wgg'] for ct in corr_types]), ("Must specify corr_types as 'wth' (angular clust.), "
 																			"'wgg' (proj. clust.) or 'wgp' (proj. direct IA) per correlation "
-																			 "-- adding more correlations soon")
+																			 "-- can add more correlations on request")
+		# copy paths arguments if no second set of paths specified
 		if paths_data2 in [[''], []]:
 			paths_data2 = list(paths_data1)
 		if paths_rand2 in [[''], []]:
 			paths_rand2 = list(paths_rand1)
-		if data_cuts2 in [[''], []]:
-			data_cuts2 = list(data_cuts1)
-		if rand_cuts2 in [[''], []]:
-			rand_cuts2 = list(rand_cuts1)
-		if data_weights2 in [[''], []]:
-			data_weights2 = list(data_weights1)
-		if rand_weights2 in [[''], []]:
-			rand_weights2 = list(rand_weights1)
 
-		# ensure each argument is specified once, to be carried over for all correlations,
+		# ensure each argument is specified once,
+		# to be carried over for all correlations,
 		# or for each correlation individually
 		ncats = (len(paths_data1), len(paths_data2), len(paths_rand1), len(paths_rand2))
 		ncuts = (len(data_cuts1), len(data_cuts2), len(rand_cuts1), len(rand_cuts2))
@@ -212,7 +205,7 @@ class Correlate:
 			if not isdir(dirname(outfiles[i])):
 				makedirs(dirname(outfiles[i]))
 
-		# construct correlations to loop over
+		# construct list of correlations to loop over
 		loop = range(len(paths_data1))
 		if (args.index is not None and
 			args.rindex is not None): # keep some/remove some
@@ -297,7 +290,6 @@ class Correlate:
 			self.random_oversampling = args.down
 			self.save_3d = int(tc_wgp_config['save_3d'])
 
-		self.build_jackknife = int(cp.get('jackknife', 'build', fallback=0))
 		self.run_jackknife = int(cp.get('jackknife', 'run', fallback=0))
 		if self.run_jackknife == 1:
 			print("== Run_jackknife = 1 -- performing N jackknife correlations excluding regions N")
