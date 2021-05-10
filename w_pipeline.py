@@ -141,7 +141,6 @@ class Correlate:
 		if paths_rand2 in [[''], []]:
 			paths_rand2 = list(paths_rand1)
 
-		print(data_cuts1,data_cuts2,rand_cuts1,rand_cuts2)
 		# ensure each argument is specified once,
 		# to be carried over for all correlations,
 		# or for each correlation individually
