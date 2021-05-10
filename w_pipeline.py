@@ -206,7 +206,7 @@ class Correlate:
 				makedirs(dirname(outfiles[i]))
 
 		# construct list of correlations to loop over
-		loop = np.arange(len(paths_data1), dtype=int)
+		loop = list(np.arange(len(paths_data1), dtype=int))
 		if (args.index is not None and
 			args.rindex is not None): # keep some/remove some
 			loop = [i for i in loop if loop.index(i) in args.index and loop.index(i) not in args.rindex]
@@ -345,7 +345,7 @@ class Correlate:
 			rn.process(rand1, data2)
 			nn.write(outfile, rr=rr, dr=nr, rd=rn, file_type='ASCII', precision=6)
 		# remove the additional header with correlation details -- these are in the treecorr config file
-		os.system("sed -i -e '/##/ { d; }' %s"%outfile)
+		os.system("sed -i '' -e '/##/ { d; }' %s"%outfile)
 
 		del data1, rand1, nn, nr, rr
 		if not auto:
