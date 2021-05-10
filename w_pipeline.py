@@ -104,28 +104,28 @@ class Correlate:
 		# replace empty arguments with 'none' for cuts, or 'ones' for weights
 		if data_cuts1 in [[''], []]:
 			if args.verbosity >= 1: print('== No sample(1) cuts (data_cuts1) specified; none')
-			data_cuts1 = ['none'] * len(paths_data1)
+			data_cuts1 = ['none']
 		if rand_cuts1 in [[''], []]:
 			if args.verbosity >= 1: print('== No randoms(1) cuts (rand_cuts1) specified; none')
-			rand_cuts1 = ['none'] * len(paths_rand1)
+			rand_cuts1 = ['none']
 		if data_weights1 in [[''], []]:
 			if args.verbosity >= 1: print('== Galaxy(1) weighting (data_weights1) not set; assuming unit weights for all')
-			data_weights1 = ['ones'] * len(paths_data1)
+			data_weights1 = ['ones']
 		if rand_weights1 in [[''], []]:
 			if args.verbosity >= 1: print('== Randoms(1) weighting (rand_weights1) not set; assuming unit weights for all')
-			rand_weights1 = ['ones'] * len(paths_data1)
+			rand_weights1 = ['ones']
 		if data_cuts2 in [[''], []]:
 			if args.verbosity >= 1: print('== No sample(2) cuts (data_cuts2) specified; none')
-			data_cuts2 = ['none'] * len(paths_data2)
+			data_cuts2 = ['none']
 		if rand_cuts2 in [[''], []]:
 			if args.verbosity >= 1: print('== No randoms(2) cuts (rand_cuts2) specified; none')
-			rand_cuts2 = ['none'] * len(paths_rand2)
+			rand_cuts2 = ['none']
 		if data_weights2 in [[''], []]:
 			if args.verbosity >= 1: print('== Galaxy(2) weighting (data_weights2) not set; assuming unit weights for all')
-			data_weights2 = ['ones'] * len(paths_data2)
+			data_weights2 = ['ones']
 		if rand_weights2 in [[''], []]:
 			if args.verbosity >= 1: print('== Randoms(2) weighting (rand_weights2) not set; assuming unit weights for all')
-			rand_weights2 = ['ones'] * len(paths_data2)
+			rand_weights2 = ['ones']
 
 		if corr_types in [[''], []]:
 			print('== Correlation types (corr_types) not set; assuming angular clustering for all')
@@ -141,6 +141,7 @@ class Correlate:
 		if paths_rand2 in [[''], []]:
 			paths_rand2 = list(paths_rand1)
 
+		print(data_cuts1,data_cuts2,rand_cuts1,rand_cuts2)
 		# ensure each argument is specified once,
 		# to be carried over for all correlations,
 		# or for each correlation individually
