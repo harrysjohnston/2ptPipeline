@@ -2,8 +2,8 @@ print("\n2-point correlation pipeline -- Harry Johnston 2019")
 print("Work in progress!")
 print("\nNotes:")
 print("meanr and meanlogr in outputs are preliminary and untested (30/04/21)")
-print("Also, shot/shape-noise errors require further testing,")
-print("so do not trust these implicitly.")
+print("Also, shot/shape-noise for projected correlations require further testing,")
+print("so do not trust these implicitly. Shot noise for w(theta) should be fine.")
 print("h.s.johnston@uu.nl\n")
 import os
 import gc
@@ -206,7 +206,7 @@ class Correlate:
 				makedirs(dirname(outfiles[i]))
 
 		# construct list of correlations to loop over
-		loop = range(len(paths_data1))
+		loop = np.arange(len(paths_data1), dtype=int)
 		if (args.index is not None and
 			args.rindex is not None): # keep some/remove some
 			loop = [i for i in loop if loop.index(i) in args.index and loop.index(i) not in args.rindex]
