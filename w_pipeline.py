@@ -1,12 +1,9 @@
 print("\n2-point correlation pipeline -- Harry Johnston 2019")
 print("Work in progress!")
 print("\nNotes:")
-print("meanr and meanlogr in outputs are not accurate,")
-print("as they take the pair-weighted average of meanr over the Pi-axis,")
-print("i.e. the mean of a mean -- use only as instructive, and beware")
-print("especially in case of weighted correlations.")
-print("Also, shot/shape-noise errors require further testing,")
-print("so do not trust these implicitly.")
+print("meanr and meanlogr in outputs are preliminary and untested (30/04/21)")
+print("Also, shot/shape-noise for projected correlations require further testing,")
+print("so do not trust these implicitly. Shot noise for w(theta) should be fine.")
 print("h.s.johnston@uu.nl\n")
 import os
 import gc
@@ -69,7 +66,8 @@ class Correlate:
 			print('== Overriding config arguments from command line:')
 			for ap in args.p:
 				s = ap.split('.')[0]
-				p, v = ap.replace(s, '')[1:].split('=')
+				p = ap.split('.')[1].split('=')[0]
+				v = ap.split('=')[1]
 				if args.verbosity >= 1:
 					print('==== %s.%s:->%s'%(s, p, v))
 				cp.set(s, p, value=v)
@@ -103,20 +101,32 @@ class Correlate:
 			map(lambda x: [i for i in x if i != ''], [data_cuts1, data_cuts2, rand_cuts1, rand_cuts2, data_weights1, data_weights2, rand_weights1, rand_weights2])
 		corr_types = [i for i in corr_types if i != '']
 
-		# if not providing different catalogues/cuts/weights for cross-correlation,
-		# copy arguments for auto-correlations
+		# replace empty arguments with 'none' for cuts, or 'ones' for weights
 		if data_cuts1 in [[''], []]:
-			if args.verbosity >= 1: print('== No sample cuts (data_cuts) specified; none')
-			data_cuts1 = ['none'] * len(paths_data1)
+			if args.verbosity >= 1: print('== No sample(1) cuts (data_cuts1) specified; none')
+			data_cuts1 = ['none']
 		if rand_cuts1 in [[''], []]:
-			if args.verbosity >= 1: print('== No randoms cuts (rand_cuts) specified; none')
-			rand_cuts1 = ['none'] * len(paths_rand1)
+			if args.verbosity >= 1: print('== No randoms(1) cuts (rand_cuts1) specified; none')
+			rand_cuts1 = ['none']
 		if data_weights1 in [[''], []]:
-			if args.verbosity >= 1: print('== Galaxy weighting (data_weights) not set; assuming unity weights for all')
-			data_weights1 = ['ones'] * len(paths_data1)
+			if args.verbosity >= 1: print('== Galaxy(1) weighting (data_weights1) not set; assuming unit weights for all')
+			data_weights1 = ['ones']
 		if rand_weights1 in [[''], []]:
-			if args.verbosity >= 1: print('== Randoms weighting (rand_weights) not set; assuming unity weights for all')
-			rand_weights1 = ['ones'] * len(paths_data1)
+			if args.verbosity >= 1: print('== Randoms(1) weighting (rand_weights1) not set; assuming unit weights for all')
+			rand_weights1 = ['ones']
+		if data_cuts2 in [[''], []]:
+			if args.verbosity >= 1: print('== No sample(2) cuts (data_cuts2) specified; none')
+			data_cuts2 = ['none']
+		if rand_cuts2 in [[''], []]:
+			if args.verbosity >= 1: print('== No randoms(2) cuts (rand_cuts2) specified; none')
+			rand_cuts2 = ['none']
+		if data_weights2 in [[''], []]:
+			if args.verbosity >= 1: print('== Galaxy(2) weighting (data_weights2) not set; assuming unit weights for all')
+			data_weights2 = ['ones']
+		if rand_weights2 in [[''], []]:
+			if args.verbosity >= 1: print('== Randoms(2) weighting (rand_weights2) not set; assuming unit weights for all')
+			rand_weights2 = ['ones']
+
 		if corr_types in [[''], []]:
 			print('== Correlation types (corr_types) not set; assuming angular clustering for all')
 			corr_types = ['wth'] * len(paths_data1)
@@ -124,21 +134,15 @@ class Correlate:
 			if corr_types[-1] == '': corr_types = corr_types[:-1]
 			assert all([ct in ['wth', 'wgp', 'wgg'] for ct in corr_types]), ("Must specify corr_types as 'wth' (angular clust.), "
 																			"'wgg' (proj. clust.) or 'wgp' (proj. direct IA) per correlation "
-																			 "-- adding more correlations soon")
+																			 "-- can add more correlations on request")
+		# copy paths arguments if no second set of paths specified
 		if paths_data2 in [[''], []]:
 			paths_data2 = list(paths_data1)
 		if paths_rand2 in [[''], []]:
 			paths_rand2 = list(paths_rand1)
-		if data_cuts2 in [[''], []]:
-			data_cuts2 = list(data_cuts1)
-		if rand_cuts2 in [[''], []]:
-			rand_cuts2 = list(rand_cuts1)
-		if data_weights2 in [[''], []]:
-			data_weights2 = list(data_weights1)
-		if rand_weights2 in [[''], []]:
-			rand_weights2 = list(rand_weights1)
 
-		# ensure each argument is specified once, to be carried over for all correlations,
+		# ensure each argument is specified once,
+		# to be carried over for all correlations,
 		# or for each correlation individually
 		ncats = (len(paths_data1), len(paths_data2), len(paths_rand1), len(paths_rand2))
 		ncuts = (len(data_cuts1), len(data_cuts2), len(rand_cuts1), len(rand_cuts2))
@@ -201,8 +205,8 @@ class Correlate:
 			if not isdir(dirname(outfiles[i])):
 				makedirs(dirname(outfiles[i]))
 
-		# construct correlations to loop over
-		loop = range(len(paths_data1))
+		# construct list of correlations to loop over
+		loop = list(np.arange(len(paths_data1), dtype=int))
 		if (args.index is not None and
 			args.rindex is not None): # keep some/remove some
 			loop = [i for i in loop if loop.index(i) in args.index and loop.index(i) not in args.rindex]
@@ -286,7 +290,6 @@ class Correlate:
 			self.random_oversampling = args.down
 			self.save_3d = int(tc_wgp_config['save_3d'])
 
-		self.build_jackknife = int(cp.get('jackknife', 'build', fallback=0))
 		self.run_jackknife = int(cp.get('jackknife', 'run', fallback=0))
 		if self.run_jackknife == 1:
 			print("== Run_jackknife = 1 -- performing N jackknife correlations excluding regions N")
@@ -342,7 +345,7 @@ class Correlate:
 			rn.process(rand1, data2)
 			nn.write(outfile, rr=rr, dr=nr, rd=rn, file_type='ASCII', precision=6)
 		# remove the additional header with correlation details -- these are in the treecorr config file
-		os.system("sed -i -e '/##/ { d; }' %s"%outfile)
+		os.system("sed -i '' -e '/##/ { d; }' %s"%outfile)
 
 		del data1, rand1, nn, nr, rr
 		if not auto:
@@ -398,7 +401,7 @@ class Correlate:
 		rand_int_w1 = rwcol1[rwcol1!=0][rand_int_ind_1]
 		rand_int_w2 = rwcol2[rwcol2!=0][rand_int_ind_2]
 
-		# get pair-normalisation factors
+		# get pair-normalisation factors = total sum of (non-duplicate) weighted pairs with unlimited separation
 		ng_tot = 1.*data1.sumw*data2.sumw - np.sum(data_int_w1*data_int_w2)
 		rr_tot = 1.*rand1.sumw*rand2.sumw - np.sum(rand_int_w1*rand_int_w2)
 		rg_tot = 1.*rand1.sumw*data2.sumw
@@ -462,8 +465,8 @@ class Correlate:
 		varg = np.sum(varg_3D, axis=0)
 		DS = np.sum(DS_3D, axis=0)
 		RS = np.sum(RS_3D, axis=0)
-		meanr = np.average(meanr_3D, axis=0, weights=DD_3D)
-		meanlogr = np.average(meanlogr_3D, axis=0, weights=DD_3D)
+		meanr = np.sum(meanr_3D, axis=0) / DS
+		meanlogr = np.sum(meanlogr_3D, axis=0) / DS
 		r = np.column_stack((ng.rnom, meanr, meanlogr))
 		output = np.column_stack((r, gt, gx, varg**0.5, DS, RS))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgplus','wgcross','noise','DSpairs','RSpairs')))
@@ -478,8 +481,10 @@ class Correlate:
 				DSntot -= data2.ntot
 			RSntot = rand1.ntot * data2.ntot
 
-			output_dict = {'r':r,'meanr':meanr_3D,'meanlogr':meanlogr_3D,'Pi':Pi,'w3d':gt_3D,'wx3d':gx_3D,'noise3d':varg_3D**0.5,'DS_3d':DS_3D,'RS_3d':RS_3D,'DD_3d':DD_3D,
-							'DSntot':DSntot,'RSntot':RSntot}
+			output_dict = {'r':r,'meanr':meanr_3D,'meanlogr':meanlogr_3D,
+						   'Pi':Pi,'w3d':gt_3D,'wx3d':gx_3D,'noise3d':varg_3D**0.5,
+						   'DS_3d':DS_3D,'RS_3d':RS_3D,'DD_3d':DD_3D,
+						   'DSntot':DSntot,'RSntot':RSntot}
 			if outfile.endswith('.dat'):
 				outfile3d = outfile.replace('.dat', '.p')
 			elif '.jk' in outfile:
@@ -570,8 +575,8 @@ class Correlate:
 			else:
 				RD_3D[p] += rn.weight
 			RR_3D[p] += rr.weight
-			meanr_3D[p] += nn.meanr
-			meanlogr_3D[p] += nn.meanlogr
+			meanr_3D[p] += nn.meanr * nn.weight
+			meanlogr_3D[p] += nn.meanlogr * nn.weight
 
 		# compute/save projected statistics
 		if self.rpar_edges is None:
@@ -583,8 +588,8 @@ class Correlate:
 		DRpair = np.sum(DR_3D, axis=0)
 		RDpair = np.sum(RD_3D, axis=0)
 		RRpair = np.sum(RR_3D, axis=0)
-		meanr = np.average(meanr_3D, axis=0, weights=DD_3D)
-		meanlogr = np.average(meanlogr_3D, axis=0, weights=DD_3D)
+		meanr = np.sum(meanr_3D, axis=0) / DDpair
+		meanlogr = np.sum(meanlogr_3D, axis=0) / DDpair
 		r = np.column_stack((nn.rnom, meanr, meanlogr))
 		output = np.column_stack((r, wgg, varw**0.5, DDpair, DRpair, RDpair, RRpair))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgg','noise','DDpairs','DRpairs','RDpairs','RRpairs')))
@@ -604,7 +609,8 @@ class Correlate:
 				DRntot = data1.ntot * rand2.ntot
 				RDntot = rand1.ntot * data2.ntot
 
-			output_dict = {'r':r,'meanr':meanr_3D,'meanlogr':meanlogr_3D,'Pi':Pi,'w3d':wgg_3D,'noise3d':varw_3D**0.5,
+			output_dict = {'r':r,'meanr':meanr_3D,'meanlogr':meanlogr_3D,
+						   'Pi':Pi,'w3d':wgg_3D,'noise3d':varw_3D**0.5,
 						   'DD3d':DD_3D,'DR3d':DR_3D,'RD3d':RD_3D,'RR3d':RR_3D,
 						   'DDntot':DDntot,'DRntot':DRntot,'RDntot':RDntot,'RRntot':RRntot}
 			if outfile.endswith('.dat'):
@@ -652,30 +658,6 @@ class Correlate:
 				auto = False
 			else:
 				auto = True
-
-		#	if self.build_jackknife:
-		#		# build jackknife with uniform randoms
-		#		# use randoms jackknife to create galaxy jackknife
-		#		# NEEDS DEBUG
-		#		if self.corr_types[i] in ['wgp', 'wgg']:
-		#			rrcol = self.rand_ra_col_proj
-		#			rdcol = self.rand_dec_col_proj
-		#			rzcol = self.rand_r_col
-		#			zcol = self.r_col
-		#		else:
-		#			rrcol = self.ra_col
-		#			rdcol = self.dec_col
-		#			rzcol = None
-		#			zcol = None
-		#		rand_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_rand1[i], ra_col=rrcol, dec_col=rdcol, z_col=rzcol)
-		#		data_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_data1[i], ra_col=self.ra_col, dec_col=self.dec_col, z_col=zcol)
-		#		rand_groups = rand_sk.create_jackknife()
-		#		data_groups = data_sk.create_jackknife(rand_groups)
-		#		if not auto:
-		#			rand2_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_rand2[i], ra_col=rrcol, dec_col=rdcol, z_col=rzcol)
-		#			data2_sk = skyknife.Jackknife(args.config_file, catpath=self.paths_data2[i], ra_col=self.ra_col, dec_col=self.dec_col, z_col=zcol)
-		#			rand2_groups = rand2_sk.create_jackknife(rand_groups)
-		#			data2_groups = data2_sk.create_jackknife(rand_groups)
 
 			if args.verbosity >= 1: print('\n== Auto-correlation = ', auto)
 			if args.verbosity >= 1:
@@ -737,7 +719,7 @@ class Correlate:
 					if any(match_IDs):
 						idcut = np.array(cuts)[match_IDs][0]
 						c1, c2, id1, id2 = idcut.replace(' ','').replace('idmatch','').replace('(','').replace(')','').split(',')
-						exec("idcut_bool = idmatch(%s, %s, '%s', '%s')" % (c1, c2, id1, id2))
+						idcut_bool = eval("idmatch(%s, %s, '%s', '%s')" % (c1, c2, id1, id2))
 						if idcut_bool.sum() > 0:
 							w &= idcut_bool
 							if args.verbosity >= 1: print('==== cut="%s" for %.1f%% losses' % (idcut, (~idcut_bool).sum()*100./len(idcut_bool)))
@@ -850,7 +832,7 @@ class Correlate:
 				gc.collect()
 
 			# determine galaxy weighting in similar fashion to evaluation of cuts above
-			if self.data_weights1[i] in ['ones', 'none']:
+			if self.data_weights1[i] in ['ones', 'none', '']:
 				wcol1 = np.ones(len(d1))
 			else:
 				for col in np.sort(d1.columns.names):
@@ -862,7 +844,7 @@ class Correlate:
 							break
 						except:
 							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights1[i], col))
-			if self.data_weights2[i] in ['ones', 'none']:
+			if self.data_weights2[i] in ['ones', 'none', '']:
 				wcol2 = np.ones(len(d2))
 			else:
 				for col in np.sort(d2.columns.names):
@@ -874,7 +856,7 @@ class Correlate:
 							break
 						except:
 							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.data_weights2[i], col))
-			if self.rand_weights1[i] in ['ones', 'none']:
+			if self.rand_weights1[i] in ['ones', 'none', '']:
 				rwcol1 = np.ones(len(r1))
 			else:
 				for col in np.sort(r1.columns.names):
@@ -886,7 +868,7 @@ class Correlate:
 							break
 						except:
 							if args.verbosity >= 2: print('==== weights="%s" mismatched to column="%s" -- no action' % (self.rand_weights1[i], col))
-			if self.rand_weights2[i] in ['ones', 'none']:
+			if self.rand_weights2[i] in ['ones', 'none', '']:
 				rwcol2 = np.ones(len(r2))
 			else:
 				for col in np.sort(r2.columns.names):
@@ -1047,25 +1029,3 @@ if __name__ == '__main__':
 
 
 
-
-
-
-
-
-
-
-#		if args.remask_randoms:
-#			#import healpy as hp
-#			#nside = 2048
-#			#npix = hp.nside2npix(nside)
-#			#gpid = hp.ang2pix(nside, d1[ra_col], d1[dec_col], lonlat=True)
-#			#rpid = hp.ang2pix(nside, r1[ra_col], r1[dec_col], lonlat=True)
-#			#gmap = np.bincount(gpid, minlength=npix)
-#			#pixcut = np.where(gmap[rpid] == 0, False, True)
-#			#r1 = r1[pixcut]
-#			#if not auto:
-#			#	gpid = hp.ang2pix(nside, d2[ra_col], d2[dec_col], lonlat=True)
-#			#	rpid = hp.ang2pix(nside, r2[ra_col], r2[dec_col], lonlat=True)
-#			#	gmap = np.bincount(gpid, minlength=npix)
-#			#	pixcut = np.where(gmap[rpid] == 0, False, True)
-#			#	r2 = r2[pixcut]
