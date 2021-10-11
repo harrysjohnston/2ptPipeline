@@ -7,6 +7,7 @@ print("so do not trust these implicitly. Shot noise for w(theta) should be fine.
 print("h.s.johnston@uu.nl\n")
 import os
 import gc
+import sys
 import pickle
 import treecorr
 import argparse
@@ -132,9 +133,14 @@ class Correlate:
 			corr_types = ['wth'] * len(paths_data1)
 		else:
 			if corr_types[-1] == '': corr_types = corr_types[:-1]
-			assert all([ct in ['wth', 'wgp', 'wgg'] for ct in corr_types]), ("Must specify corr_types as 'wth' (angular clust.), "
+			assert all([ct in ['wth', 'wgp', 'wgg'] for ct in corr_types]), ("must specify corr_types as 'wth' (angular clust.), "
 																			"'wgg' (proj. clust.) or 'wgp' (proj. direct IA) per correlation "
 																			 "-- can add more correlations on request")
+			assert not ('wth' in corr_types and ('wgg' in corr_types or 'wgp' in corr_types)), \
+				"must currently use separate config files for angluar and projected correlations"
+		angular_corrs = 'wth' in corr_types
+		projected_corrs = 'wgg' in corr_types or 'wgp' in corr_types
+
 		# copy paths arguments if no second set of paths specified
 		if paths_data2 in [[''], []]:
 			paths_data2 = list(paths_data1)
@@ -219,59 +225,86 @@ class Correlate:
 		if args.randomise:
 			np.random.shuffle(loop)
 
-		# re-write this to include treecorr config options in my own config file?
-		tc_config_path = expandvars(cp.get('treecorr_config', 'default'))
-		try:
+		if angular_corrs:
+			tc_config_path = expandvars(cp.get('treecorr_config', 'default'))
 			tc_config = treecorr.read_config(tc_config_path)
+			if args.bin_slop is not None: tc_config['bin_slop'] = args.bin_slop
+			tc_config['num_threads'] = args.num_threads
+			tc_config['verbose'] = args.verbosity
 			for option in cpd['treecorr_config'].keys():
 				if option == 'default': continue
 				tc_config[option] = cpd['treecorr_config'][option]
-			if args.bin_slop is not None:
-				tc_config['bin_slop'] = args.bin_slop
-			tc_config['num_threads'] = args.num_threads
-			tc_config['verbose'] = args.verbosity
 			self.ra_col = tc_config['ra_col']
 			self.dec_col = tc_config['dec_col']
 			self.ra_units = tc_config['ra_units']
 			self.dec_units = tc_config['dec_units']
 			self.tc_config = tc_config
-		except ValueError:
-			print("== No treecorr config passed -- parameters for projected correlations should be specified in w_pipe config")
-			tc_wgp_config = cpd['wgplus_config']
-			if args.bin_slop is not None:
-				tc_wgp_config['bin_slop'] = args.bin_slop
-			tc_wgp_config['num_threads'] = args.num_threads
-			tc_wgp_config['verbose'] = args.verbosity
+
+		if projected_corrs:
+			tc_proj_config = cpd['wgplus_config']
+			if args.bin_slop is not None: tc_proj_config['bin_slop'] = args.bin_slop
+			tc_proj_config['num_threads'] = args.num_threads
+			tc_proj_config['verbose'] = args.verbosity
 			for option in cpd['treecorr_config'].keys():
 				if option == 'default': continue
-				tc_wgp_config[option] = cpd['treecorr_config'][option]
-			self.tc_wgp_config = tc_wgp_config
-			self.estimator = tc_wgp_config['estimator']
-			self.ra_col_proj = tc_wgp_config['ra_col']
-			self.dec_col_proj = tc_wgp_config['dec_col']
-			self.ra_units = tc_wgp_config['ra_units']
-			self.dec_units = tc_wgp_config['dec_units']
-			self.r_col = tc_wgp_config['r_col']
-			self.rand_ra_col_proj = tc_wgp_config['rand_ra_col']
-			self.rand_dec_col_proj = tc_wgp_config['rand_dec_col']
-			self.rand_r_col = tc_wgp_config['rand_r_col']
-			if self.rand_ra_col_proj == '':
-				self.rand_ra_col_proj = self.ra_col_proj
-			if self.rand_dec_col_proj == '':
-				self.rand_dec_col_proj = self.dec_col_proj
-			if self.rand_r_col == '':
-				self.rand_r_col = self.r_col
-			self.g1_col = tc_wgp_config['g1_col']
-			self.g2_col = tc_wgp_config['g2_col']
-			self.flip_g1 = int(tc_wgp_config['flip_g1'])
-			self.flip_g2 = int(tc_wgp_config['flip_g2'])
+				tc_proj_config[option] = cpd['treecorr_config'][option]
+			self.tc_proj_config = tc_proj_config
+			self.estimator = tc_proj_config['estimator']
+			self.metric = tc_proj_config['metric']
+			self.period = tc_proj_config['period'].split()
+			if self.period == ['']:
+				assert self.metric != 'Periodic', "must give period of box if specifying periodic boundary conditions!"
+				self.period = None
+			elif len(self.period) == 1:
+				self.xperiod = self.yperiod = self.zperiod = float(self.period[0])
+			else:
+				self.xperiod, self.yperiod, self.zperiod = (float(p) for p in self.period)
+			
+			self.ra_col = tc_proj_config['ra_col']
+			self.dec_col = tc_proj_config['dec_col']
+			self.ra_units = tc_proj_config['ra_units']
+			self.dec_units = tc_proj_config['dec_units']
+			self.r_col = tc_proj_config['r_col']
+			self.rand_ra_col = tc_proj_config['rand_ra_col']
+			self.rand_dec_col = tc_proj_config['rand_dec_col']
+			self.rand_r_col = tc_proj_config['rand_r_col']
+			if self.rand_ra_col == '': self.rand_ra_col = self.ra_col
+			if self.rand_dec_col == '': self.rand_dec_col = self.dec_col
+			if self.rand_r_col == '': self.rand_r_col = self.r_col
+			self.x_col = tc_proj_config['x_col']
+			self.y_col = tc_proj_config['y_col']
+			self.z_col = tc_proj_config['z_col']
+			self.rand_x_col = tc_proj_config['rand_x_col']
+			self.rand_y_col = tc_proj_config['rand_y_col']
+			self.rand_z_col = tc_proj_config['rand_z_col']
+			if self.rand_x_col == '': self.rand_x_col = self.x_col
+			if self.rand_y_col == '': self.rand_y_col = self.y_col
+			if self.rand_z_col == '': self.rand_z_col = self.z_col
+
+			if self.x_col != '' and self.ra_col != '':
+				self.coordinates = 'RADEC'
+			elif self.ra_col != '':
+				self.coordinates = 'RADEC'
+			elif self.x_col != '':
+				self.coordinates = 'XYZ'
+			else:
+				sys.exit('== Column names not specified in config file?')
+
+			self.g1_col = tc_proj_config['g1_col']
+			self.g2_col = tc_proj_config['g2_col']
+			self.flip_g1 = int(tc_proj_config['flip_g1'])
+			self.flip_g2 = int(tc_proj_config['flip_g2'])
 			self.fg1 = (1., -1.)[self.flip_g1]
 			self.fg2 = (1., -1.)[self.flip_g2]
-			self.min_rpar = float(tc_wgp_config['min_rpar'])
-			self.max_rpar = float(tc_wgp_config['max_rpar'])
-			self.nbins_rpar = int(tc_wgp_config['nbins_rpar'])
 			try:
-				self.rpar_edges = np.array([float(i) for i in tc_wgp_config['rpar_edges'].replace(' ','').strip("'").strip('"').split(',')])
+				self.min_rpar = float(tc_proj_config['min_rpar'])
+				self.max_rpar = float(tc_proj_config['max_rpar'])
+				self.nbins_rpar = int(tc_proj_config['nbins_rpar'])
+			except:
+				del self.tc_proj_config['min_rpar']
+				del self.tc_proj_config['max_rpar']
+			try:
+				self.rpar_edges = np.array([float(i) for i in tc_proj_config['rpar_edges'].replace(' ','').strip("'").strip('"').split(',')])
 				if self.rpar_edges[0] != 0:
 					self.rpar_edges = np.insert(self.rpar_edges, 0, 0.)
 				if not self.rpar_edges.min() < 0:
@@ -284,11 +317,12 @@ class Correlate:
 				print(self.rpar_edges)
 			except:
 				self.rpar_edges = None
-			self.nbins = int(tc_wgp_config['nbins'])
-			self.largePi = int(tc_wgp_config['largepi'])
-			self.compensated = int(tc_wgp_config['compensated'])
+			self.nbins = int(tc_proj_config['nbins'])
+			self.largePi = int(tc_proj_config['largepi'])
+			if self.coordinates == 'XYZ': print('== Warning: largePi has no meaning for XYZ coordinates!')
+			self.compensated = int(tc_proj_config['compensated'])
 			self.random_oversampling = args.down
-			self.save_3d = int(tc_wgp_config['save_3d'])
+			self.save_3d = int(tc_proj_config['save_3d'])
 
 		self.run_jackknife = int(cp.get('jackknife', 'run', fallback=0))
 		if self.run_jackknife == 1:
@@ -369,32 +403,32 @@ class Correlate:
 		meanr_3D = np.zeros([self.nbins_rpar, self.nbins])
 		meanlogr_3D = np.zeros([self.nbins_rpar, self.nbins])
 
-		data1 = treecorr.Catalog(ra=d1[self.ra_col_proj], dec=d1[self.dec_col_proj], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1,
+		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1,
 								 r=d1[self.r_col])#, g1=d1[self.g1_col] * self.fg1, g2=d1[self.g2_col] * self.fg2)
-		data2 = treecorr.Catalog(ra=d2[self.ra_col_proj], dec=d2[self.dec_col_proj], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol2,
+		data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol2,
 								 r=d2[self.r_col], g1=d2[self.g1_col] * self.fg1, g2=d2[self.g2_col] * self.fg2)
-		rand1 = treecorr.Catalog(ra=r1[self.rand_ra_col_proj], dec=r1[self.rand_dec_col_proj], ra_units=self.ra_units, dec_units=self.dec_units,
+		rand1 = treecorr.Catalog(ra=r1[self.rand_ra_col], dec=r1[self.rand_dec_col], ra_units=self.ra_units, dec_units=self.dec_units,
 								 r=r1[self.rand_r_col], is_rand=1, w=rwcol1)
-		rand2 = treecorr.Catalog(ra=r2[self.rand_ra_col_proj], dec=r2[self.rand_dec_col_proj], ra_units=self.ra_units, dec_units=self.dec_units,
+		rand2 = treecorr.Catalog(ra=r2[self.rand_ra_col], dec=r2[self.rand_dec_col], ra_units=self.ra_units, dec_units=self.dec_units,
 								 r=r2[self.rand_r_col], is_rand=1, w=rwcol2)
 		varg = treecorr.calculateVarG(data2)
 
 
 		# find duplicate objects between d1/2 and r1/2
-		set_d1_ra = set(d1[self.ra_col_proj][wcol1!=0])
-		set_d2_ra = set(d2[self.ra_col_proj][wcol2!=0])
-		data_ind_dict_1 = dict((k,i) for i,k in enumerate(d1[self.ra_col_proj][wcol1!=0]))
-		data_ind_dict_2 = dict((k,i) for i,k in enumerate(d2[self.ra_col_proj][wcol2!=0]))
+		set_d1_ra = set(d1[self.ra_col][wcol1!=0])
+		set_d2_ra = set(d2[self.ra_col][wcol2!=0])
+		data_ind_dict_1 = dict((k,i) for i,k in enumerate(d1[self.ra_col][wcol1!=0]))
+		data_ind_dict_2 = dict((k,i) for i,k in enumerate(d2[self.ra_col][wcol2!=0]))
 		data_intersection = set_d1_ra.intersection(set_d2_ra)
 		data_int_ind_1 = [data_ind_dict_1[x] for x in data_intersection]
 		data_int_ind_2 = [data_ind_dict_2[x] for x in data_intersection]
 		data_int_w1 = wcol1[wcol1!=0][data_int_ind_1]
 		data_int_w2 = wcol2[wcol2!=0][data_int_ind_2]
 
-		set_r1_ra = set(r1[self.rand_ra_col_proj][rwcol1!=0])
-		set_r2_ra = set(r2[self.rand_ra_col_proj][rwcol2!=0])
-		rand_ind_dict_1 = dict((k,i) for i,k in enumerate(r1[self.rand_ra_col_proj][rwcol1!=0]))
-		rand_ind_dict_2 = dict((k,i) for i,k in enumerate(r2[self.rand_ra_col_proj][rwcol2!=0]))
+		set_r1_ra = set(r1[self.rand_ra_col][rwcol1!=0])
+		set_r2_ra = set(r2[self.rand_ra_col][rwcol2!=0])
+		rand_ind_dict_1 = dict((k,i) for i,k in enumerate(r1[self.rand_ra_col][rwcol1!=0]))
+		rand_ind_dict_2 = dict((k,i) for i,k in enumerate(r2[self.rand_ra_col][rwcol2!=0]))
 		rand_intersection = set_r1_ra.intersection(set_r2_ra)
 		rand_int_ind_1 = [rand_ind_dict_1[x] for x in rand_intersection]
 		rand_int_ind_2 = [rand_ind_dict_2[x] for x in rand_intersection]
@@ -416,7 +450,7 @@ class Correlate:
 				continue
 
 			# limit correlation to this Pi-bin
-			conf_pi = self.tc_wgp_config.copy()
+			conf_pi = self.tc_proj_config.copy()
 			conf_pi['min_rpar'] = Pi[p]
 			conf_pi['max_rpar'] = Pi[p+1]
 
@@ -493,7 +527,7 @@ class Correlate:
 			else:
 				print("==== Unrecognised output type -- not saving 3D correlations")
 				return None
-			pickle.dump(output_dict, open(outfile3d, 'w'))
+			pickle.dump(output_dict, open(outfile3d, 'wb'))
 
 		del data1, rand1, data2, rand2, ng, rg
 		gc.collect()
@@ -515,14 +549,14 @@ class Correlate:
 		meanr_3D = np.zeros([self.nbins_rpar, self.nbins])
 		meanlogr_3D = np.zeros([self.nbins_rpar, self.nbins])
 
-		data1 = treecorr.Catalog(ra=d1[self.ra_col_proj], dec=d1[self.dec_col_proj], r=d1[self.r_col], w=wcol1,
+		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], r=d1[self.r_col], w=wcol1,
 								 ra_units=self.ra_units, dec_units=self.dec_units)
-		rand1 = treecorr.Catalog(ra=r1[self.rand_ra_col_proj], dec=r1[self.rand_dec_col_proj], r=r1[self.rand_r_col], is_rand=1, w=rwcol1,
+		rand1 = treecorr.Catalog(ra=r1[self.rand_ra_col], dec=r1[self.rand_dec_col], r=r1[self.rand_r_col], is_rand=1, w=rwcol1,
 								 ra_units=self.ra_units, dec_units=self.dec_units)
 		if not auto:
-			data2 = treecorr.Catalog(ra=d2[self.ra_col_proj], dec=d2[self.dec_col_proj], r=d2[self.r_col], w=wcol2,
+			data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], r=d2[self.r_col], w=wcol2,
 									 ra_units=self.ra_units, dec_units=self.dec_units)
-			rand2 = treecorr.Catalog(ra=r2[self.rand_ra_col_proj], dec=r2[self.rand_dec_col_proj], r=r2[self.rand_r_col], is_rand=1, w=rwcol2,
+			rand2 = treecorr.Catalog(ra=r2[self.rand_ra_col], dec=r2[self.rand_dec_col], r=r2[self.rand_r_col], is_rand=1, w=rwcol2,
 									 ra_units=self.ra_units, dec_units=self.dec_units)
 
 		# loop over Pi-bins collecting w(rp, Pi[p])
@@ -532,7 +566,7 @@ class Correlate:
 				continue
 
 			# limit correlation to this Pi-bin
-			conf_pi = self.tc_wgp_config.copy()
+			conf_pi = self.tc_proj_config.copy()
 			conf_pi['min_rpar'] = Pi[p]
 			conf_pi['max_rpar'] = Pi[p+1]
 
@@ -620,7 +654,163 @@ class Correlate:
 			else:
 				print("==== Unrecognised output type -- not saving 3D correlations")
 				return None
-			pickle.dump(output_dict, open(outfile3d, 'w'))
+			pickle.dump(output_dict, open(outfile3d, 'wb'))
+
+		del data1, rand1, nn, nr, rr
+		if not auto:
+			del data2, rand2, rn
+		gc.collect()
+
+	def compute_xigplus_xyz(self, d1, r1, d2, r2, outfile, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
+		gt = np.zeros(self.nbins)
+		gx = np.zeros(self.nbins)
+		varg = np.zeros(self.nbins)
+		DD = np.zeros(self.nbins)
+		DS = np.zeros(self.nbins)
+		RS = np.zeros(self.nbins)
+		meanr = np.zeros(self.nbins)
+		meanlogr = np.zeros(self.nbins)
+
+		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1)
+		data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2, g1=d2[self.g1_col] * self.fg1, g2=d2[self.g2_col] * self.fg2)
+		rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1)
+		rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, w=rwcol2)
+		varg = treecorr.calculateVarG(data2)
+
+		# find duplicate objects between d1/2 and r1/2
+		set_d1_x = set(d1[self.x_col][wcol1!=0])
+		set_d2_x = set(d2[self.x_col][wcol2!=0])
+		data_ind_dict_1 = dict((k,i) for i,k in enumerate(d1[self.x_col][wcol1!=0]))
+		data_ind_dict_2 = dict((k,i) for i,k in enumerate(d2[self.x_col][wcol2!=0]))
+		data_intersection = set_d1_x.intersection(set_d2_x)
+		data_int_ind_1 = [data_ind_dict_1[x] for x in data_intersection]
+		data_int_ind_2 = [data_ind_dict_2[x] for x in data_intersection]
+		data_int_w1 = wcol1[wcol1!=0][data_int_ind_1]
+		data_int_w2 = wcol2[wcol2!=0][data_int_ind_2]
+
+		set_r1_x = set(r1[self.rand_x_col][rwcol1!=0])
+		set_r2_x = set(r2[self.rand_x_col][rwcol2!=0])
+		rand_ind_dict_1 = dict((k,i) for i,k in enumerate(r1[self.rand_x_col][rwcol1!=0]))
+		rand_ind_dict_2 = dict((k,i) for i,k in enumerate(r2[self.rand_x_col][rwcol2!=0]))
+		rand_intersection = set_r1_x.intersection(set_r2_x)
+		rand_int_ind_1 = [rand_ind_dict_1[x] for x in rand_intersection]
+		rand_int_ind_2 = [rand_ind_dict_2[x] for x in rand_intersection]
+		rand_int_w1 = rwcol1[rwcol1!=0][rand_int_ind_1]
+		rand_int_w2 = rwcol2[rwcol2!=0][rand_int_ind_2]
+
+		# get pair-normalisation factors = total sum of (non-duplicate) weighted pairs with unlimited separation
+		ng_tot = 1.*data1.sumw*data2.sumw - np.sum(data_int_w1*data_int_w2)
+		rr_tot = 1.*rand1.sumw*rand2.sumw - np.sum(rand_int_w1*rand_int_w2)
+		rg_tot = 1.*rand1.sumw*data2.sumw
+		rgw = ng_tot / rg_tot
+		rrw = ng_tot / rr_tot
+		rrgw = rg_tot / rr_tot
+
+		conf = self.tc_proj_config.copy()
+		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod)
+		ng = treecorr.NGCorrelation(conf, **p_args)
+		rg = treecorr.NGCorrelation(conf, **p_args)
+		ng.process_cross(data1, data2)
+		rg.process_cross(rand1, data2)
+		ng.varxi = varg
+		ng.varxi = varg
+
+		# calculate appropriate normalisation of terms for chosen estimator
+		if self.estimator == 'PW1': # RDs (rg) norm
+			norm1 = rg.weight * rgw
+			norm2 = rg.weight
+		if self.estimator == 'PW2': # RRs (rr) norm
+			rr = treecorr.NNCorrelation(conf)
+			rr.process_cross(rand1, rand2)
+			norm1 = rr.weight * rrw
+			norm2 = rr.weight * rrgw
+		elif self.estimator == 'AS': # DDs (ng), RDs (rg) norms
+			norm1 = ng.weight
+			norm2 = rg.weight
+
+		# subtract randoms correlations
+		if self.compensated:
+			gt += (ng.xi / norm1) - (rg.xi / norm2)
+			gx += (ng.xi_im / norm1) - (rg.xi_im / norm2)
+			varg += (ng.varxi / norm1) + (rg.varxi / norm2)
+		else: # or not
+			gt += ng.xi / norm1
+			gx += ng.xi_im / norm1
+			varg += ng.varxi / norm1
+		DD += ng.npairs
+		DS += ng.weight
+		RS += rg.weight
+		meanr += ng.meanr
+		meanlogr += ng.meanlogr
+
+		r = np.column_stack((ng.rnom, meanr, meanlogr))
+		output = np.column_stack((r, gt, gx, varg**0.5, DS, RS))
+		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgplus','wgcross','noise','DSpairs','RSpairs')))
+
+		del data1, rand1, data2, rand2, ng, rg
+		gc.collect()
+
+	def compute_xigg_xyz(self, d1, r1, outfile, auto=True, d2=None, r2=None, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
+		wgg = np.zeros(self.nbins)
+		varw = np.zeros(self.nbins)
+		DD = np.zeros(self.nbins)
+		DR = np.zeros(self.nbins)
+		RD = np.zeros(self.nbins)
+		RR = np.zeros(self.nbins)
+		meanr = np.zeros(self.nbins)
+		meanlogr = np.zeros(self.nbins)
+
+		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1)
+		rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1)
+		if not auto:
+			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2)
+			rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, w=rwcol2)
+
+		conf = self.tc_proj_config.copy()
+		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod)
+		nn = treecorr.NNCorrelation(conf, **p_args)
+		rr = treecorr.NNCorrelation(conf, **p_args)
+		nr = treecorr.NNCorrelation(conf, **p_args)
+		rn = treecorr.NNCorrelation(conf, **p_args)
+
+		if auto:
+			nn.process_cross(data1, data1)
+			rr.process_cross(rand1, rand1)
+			nr.process_cross(data1, rand1)
+			nn.finalize()
+			rr.finalize()
+			nr.finalize()
+			if self.compensated:
+				xi, varxi = nn.calculateXi(rr, dr=nr)
+			else:
+				xi, varxi = nn.calculateXi(rr)
+		else:
+			nn.process_cross(data1, data2)
+			rr.process_cross(rand1, rand2)
+			nr.process_cross(data1, rand2)
+			rn.process_cross(rand1, data2)
+			nn.finalize()
+			rr.finalize()
+			nr.finalize()
+			rn.finalize()
+			if self.compensated:
+				xi, varxi = nn.calculateXi(rr, dr=nr, rd=rn)
+			else:
+				xi, varxi = nn.calculateXi(rr)
+
+		wgg += xi
+		varw += varxi
+		DD += nn.weight
+		DR += nr.weight
+		if auto: RD += nr.weight
+		else: RD += rn.weight
+		RR += rr.weight
+		meanr += nn.meanr * nn.weight
+		meanlogr += nn.meanlogr * nn.weight
+
+		r = np.column_stack((nn.rnom, meanr, meanlogr))
+		output = np.column_stack((r, wgg, varw**0.5, DD, DR, RD, RR))
+		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgg','noise','DDpairs','DRpairs','RDpairs','RRpairs')))
 
 		del data1, rand1, nn, nr, rr
 		if not auto:
@@ -890,10 +1080,17 @@ class Correlate:
 			# perform correlation
 			if self.corr_types[i] == 'wth':
 				self.compute_wtheta(d1, r1, outfile, auto=auto, d2=d2, r2=r2, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
-			if self.corr_types[i] == 'wgp':
-				self.compute_wgplus(d1, r1, d2, r2, outfile, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
-			if self.corr_types[i] == 'wgg':
-				self.compute_wgg(d1, r1, outfile, auto=auto, d2=d2, r2=r2, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
+			if self.coordinates == 'RADEC':
+				if self.corr_types[i] == 'wgp':
+					self.compute_wgplus(d1, r1, d2, r2, outfile, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
+				if self.corr_types[i] == 'wgg':
+					self.compute_wgg(d1, r1, outfile, auto=auto, d2=d2, r2=r2, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
+			if self.coordinates == 'XYZ':
+				if self.corr_types[i] == 'wgp':
+					self.compute_xigplus_xyz(d1, r1, d2, r2, outfile, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
+				if self.corr_types[i] == 'wgg':
+					self.compute_xigg_xyz(d1, r1, outfile, auto=auto, d2=d2, r2=r2, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
+
 			# clean up
 			del d1, d2, r1, r2, fits_cats
 			gc.collect()
