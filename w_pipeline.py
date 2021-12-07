@@ -227,8 +227,12 @@ class Correlate:
 
 		if angular_corrs:
 			tc_config_path = expandvars(cp.get('angular_correlations', 'default'))
-			tc_config = treecorr.read_config(tc_config_path)
-			if args.bin_slop is not None: tc_config['bin_slop'] = args.bin_slop
+			if tc_config_path != '':
+				tc_config = treecorr.read_config(tc_config_path)
+			else:
+				tc_config = {}
+			if args.bin_slop is not None:
+				tc_config['bin_slop'] = args.bin_slop
 			tc_config['num_threads'] = args.num_threads
 			tc_config['verbose'] = args.verbosity
 			for option in cpd['angular_correlations'].keys():
@@ -239,6 +243,7 @@ class Correlate:
 			self.ra_units = tc_config['ra_units']
 			self.dec_units = tc_config['dec_units']
 			self.tc_config = tc_config
+			self.coordinates = 'RADEC'
 
 		if projected_corrs:
 			tc_proj_config = cpd['projected_correlations']
