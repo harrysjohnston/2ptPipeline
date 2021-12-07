@@ -856,7 +856,8 @@ class Correlate:
 					self.data_cuts1[i] == self.data_cuts2[i] and
 					self.rand_cuts1[i] == self.rand_cuts2[i] and
 					self.data_weights1[i] == self.data_weights2[i] and
-					self.rand_weights1[i] == self.rand_weights2[i]):
+					self.rand_weights1[i] == self.rand_weights2[i] and
+					self.corr_types[i] != 'wgp'):
 				auto = False
 			else:
 				auto = True
