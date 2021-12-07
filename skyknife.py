@@ -541,19 +541,18 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument(
 		'config',
-		help='path to skyknife config file')
+		help='Path to skyknife config file')
 	parser.add_argument(
 		'-kmeans',
 		type=int,
 		default=0,
-		help='Give desired Njk to define jackknife with kmeans_radec, with/out equal-numbers redshift slicing as per config do_3d= argument -- default=0; use skyknife method')
+		help='Give desired Njk to define jackknife with kmeans_radec, with/out equal-numbers redshift slicing as per config do_3d= argument -- default=0; use skyknife iterative quartering method')
 	parser.add_argument(
 		'-p',
 		nargs='*',
 		type=str,
 		default = [''],
-		help='with syntax "-p <arg1>=<value1>.." specify any of the following args: '
-				'catpath, ra_col, dec_col, z_col, r_col, do_3d, sc_tol, sz_tol, min_scale_deg, plot')
+		help='Override config file arguments, with syntax "-p <arg1>=<value1>.." (beware trailing slashes, and space-separated argments may not work)')
 	args = parser.parse_args()
 	kw = {}
 	for arg in args.p:

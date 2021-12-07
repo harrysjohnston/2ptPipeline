@@ -226,14 +226,14 @@ class Correlate:
 			np.random.shuffle(loop)
 
 		if angular_corrs:
-			tc_config_path = expandvars(cp.get('treecorr_config', 'default'))
+			tc_config_path = expandvars(cp.get('angular_correlations', 'default'))
 			tc_config = treecorr.read_config(tc_config_path)
 			if args.bin_slop is not None: tc_config['bin_slop'] = args.bin_slop
 			tc_config['num_threads'] = args.num_threads
 			tc_config['verbose'] = args.verbosity
-			for option in cpd['treecorr_config'].keys():
+			for option in cpd['angular_correlations'].keys():
 				if option == 'default': continue
-				tc_config[option] = cpd['treecorr_config'][option]
+				tc_config[option] = cpd['angular_correlations'][option]
 			self.ra_col = tc_config['ra_col']
 			self.dec_col = tc_config['dec_col']
 			self.ra_units = tc_config['ra_units']
@@ -241,15 +241,15 @@ class Correlate:
 			self.tc_config = tc_config
 
 		if projected_corrs:
-			tc_proj_config = cpd['wgplus_config']
+			tc_proj_config = cpd['projected_correlations']
 			if args.bin_slop is not None: tc_proj_config['bin_slop'] = args.bin_slop
 			tc_proj_config['num_threads'] = args.num_threads
 			tc_proj_config['verbose'] = args.verbosity
-			for option in cpd['treecorr_config'].keys():
+			for option in cpd['angular_correlations'].keys():
 				if option == 'default': continue
-				tc_proj_config[option] = cpd['treecorr_config'][option]
+				tc_proj_config[option] = cpd['angular_correlations'][option]
 			self.tc_proj_config = tc_proj_config
-			self.estimator = tc_proj_config['estimator']
+			self.gplus_estimator = tc_proj_config['gplus_estimator']
 			self.metric = tc_proj_config['metric']
 			self.period = tc_proj_config['period'].split()
 			if self.period == ['']:
@@ -417,7 +417,8 @@ class Correlate:
 		varg = treecorr.calculateVarG(data2)
 
 
-		# find duplicate objects between d1/2 and r1/2
+		# find duplicate objects between d1/2 and r1/2 - should replace this with IDs
+		# RA coordinates might be repeated in future...
 		set_d1_ra = set(d1[self.ra_col][wcol1!=0])
 		set_d2_ra = set(d2[self.ra_col][wcol2!=0])
 		data_ind_dict_1 = dict((k,i) for i,k in enumerate(d1[self.ra_col][wcol1!=0]))
@@ -464,16 +465,16 @@ class Correlate:
 			ng.varxi = varg
 			ng.varxi = varg
 
-			# calculate appropriate normalisation of terms for chosen estimator
-			if self.estimator == 'PW1': # RDs (rg) norm
+			# calculate appropriate normalisation of terms for chosen gplus_estimator
+			if self.gplus_estimator == 'PW1': # RDs (rg) norm
 				norm1 = rg.weight * rgw
 				norm2 = rg.weight
-			if self.estimator == 'PW2': # RRs (rr) norm
+			if self.gplus_estimator == 'PW2': # RRs (rr) norm
 				rr = treecorr.NNCorrelation(conf_pi)
 				rr.process_cross(rand1, rand2)
 				norm1 = rr.weight * rrw
 				norm2 = rr.weight * rrgw
-			elif self.estimator == 'AS': # DDs (ng), RDs (rg) norms
+			elif self.gplus_estimator == 'AS': # DDs (ng), RDs (rg) norms
 				norm1 = ng.weight
 				norm2 = rg.weight
 
@@ -718,16 +719,16 @@ class Correlate:
 		ng.varxi = varg
 		ng.varxi = varg
 
-		# calculate appropriate normalisation of terms for chosen estimator
-		if self.estimator == 'PW1': # RDs (rg) norm
+		# calculate appropriate normalisation of terms for chosen gplus_estimator
+		if self.gplus_estimator == 'PW1': # RDs (rg) norm
 			norm1 = rg.weight * rgw
 			norm2 = rg.weight
-		if self.estimator == 'PW2': # RRs (rr) norm
+		if self.gplus_estimator == 'PW2': # RRs (rr) norm
 			rr = treecorr.NNCorrelation(conf)
 			rr.process_cross(rand1, rand2)
 			norm1 = rr.weight * rrw
 			norm2 = rr.weight * rrgw
-		elif self.estimator == 'AS': # DDs (ng), RDs (rg) norms
+		elif self.gplus_estimator == 'AS': # DDs (ng), RDs (rg) norms
 			norm1 = ng.weight
 			norm2 = rg.weight
 
@@ -923,10 +924,10 @@ class Correlate:
 						del cuts[cuts.index(idcut)]
 
 					# perform custom downsample - special cut
-					custom_ds = ['custom_ds' in cut for cut in cuts]
-					if any(custom_ds):
-						dscut = np.array(cuts)[custom_ds][0]
-						custom_frac = dscut.replace('custom_ds(','').replace(')','')
+					downsample = ['downsample' in cut for cut in cuts]
+					if any(downsample):
+						dscut = np.array(cuts)[downsample][0]
+						custom_frac = dscut.replace('downsample(','').replace(')','')
 						dscut_bool = np.random.rand(len(w)) <= float(custom_frac)
 						if dscut_bool.sum() > 0:
 							w &= dscut_bool
@@ -1164,51 +1165,49 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument(
 		'config_file',
-		help='path to configuration file for correlations')
+		help='Path to configuration file for correlations')
 	parser.add_argument(
 		'-bin_slop',
 		type=float,
-		help='specify treecorr bin_slop parameter (float, default=None -- will use .ini value)')
+		help='Specify TreeCorr bin_slop parameter (float, default=None -- will use config value)')
 	parser.add_argument(
-		'-num_threads',
+		'--num-threads',
 		type=int,
 		default=16,
-		help='specify number of processors available (default=16)')
+		help='Specify number of threads to employ (default=16)')
 	parser.add_argument(
-		'-save_cats',
-		type=int,
-		default=0,
-		help='save out fits catalogues (per correlation) for inspection')
+		'--save-cats',
+		action='store_true',
+		help='Save out FITS catalogues (per correlation, after cuts) for inspection')
 	parser.add_argument(
 		'-verbosity',
 		type=int,
 		default=3,
-		help='specify treecorr verbosity (int[0,3], default=3)')
+		help='Specify verbosity (int[0,3], default=3) for TreeCorr computations, and reports from this code')
 	parser.add_argument(
 		'-down',
 		type=float,
 		default=10.,
-		help='specify factor = Nrandoms / Ngalaxies (float, default=10. // set to 0. for no downsampling)')
-	parser.add_argument(
-		'-p',
-		type=str,
-		nargs='*',
-		help='override config-file parameters e.g. -p section.param=value (make sure no trailing slashes in paths)')
+		help='Specify randoms oversampling factor = Nrandoms / Ngalaxies (float, default=10. // set to 0. for no downsampling)')
 	parser.add_argument(
 		'-index',
 		type=int,
 		nargs='*',
-		help='give indices of correlations in the config file that you desire to run -- others will be skipped. E.g. -index 0 will run only the first correlation')
+		help='Give indices of correlations in the config file that you desire to run -- others will be skipped. E.g. -index 0 will run only the first correlation')
 	parser.add_argument(
 		'-rindex',
 		type=int,
 		nargs='*',
-		help='give indices of correlations in the config file that you desire NOT to run i.e. inverse of -index argument')
+		help='Give indices of correlations in the config file that you desire NOT to run i.e. inverse of -index argument')
 	parser.add_argument(
 		'-randomise',
-		type=int,
-		default=1,
-		help='1 = randomise the order of correlations for faster coverage with many runs (default)')
+		action='store_true',
+		help='Randomise the order of correlations for faster coverage when doing multiple realisations of similar statistics')
+	parser.add_argument(
+		'-p',
+		type=str,
+		nargs='*',
+		help='Override config-file parameters e.g. -p section.param=value (make sure no trailing slashes in file paths, space-separated arguments may not work)')
 	args = parser.parse_args()
 
 	Corr = Correlate(args)
