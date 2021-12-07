@@ -18,7 +18,7 @@ for i, f in enumerate(('OUTPUTS/wgp.dat','OUTPUTS/wgg.dat')):
 		ax[1].errorbar(r, r*wgg, r*wgg_err, fmt='.-', capsize=1)
 ax[0].axhline(0, ls=':', c='k')
 ax[0].legend()
-ax[0].set_ylabel('$r_{p}w(r_{p})$')
+ax[0].set_ylabel('$r_{p}^{0.8}w(r_{p})$')
 ax[1].set_ylabel('$r_{p}w_{gg}(r_{p})$')
 ax[1].set_xlabel('$r_{p}\,[\\rm{Mpc}/h]$')
 plt.xscale('log')

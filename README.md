@@ -1,6 +1,8 @@
 # 2ptPipeline
 2-point statistics pipeline, using TreeCorr, allowing for many correlations in fewer configs, with different cuts/weighting/other choices. Primarily intended for measurement of projected correlations $w(r_p)$, but can also measure angular clustering $w(\theta)$, and recently included non-projected clustering/IA $\xi(r)$ for simulation boxes. skyknife.py defines jackknife regions in catalogues, for covariance estimation. Only FITS catalogue formats are supported.
 
+Requirements: TreeCorr, astropy, configparser
+
 # Usage
 
 Basic usage is:
@@ -23,3 +25,6 @@ Skyknife should be run against a uniform randoms catalogue before running w_pipe
 
 For use of the kmeans clustering routine, clone into this repository https://github.com/esheldon/kmeans_radec and follow the setup instructions, before running skyknife.py with the -kmeans command-line argument.
 
+# Test installation
+
+Just run ./run_tests.sh and expect to see a little plot of wg+, wgx, wgg for a small test sample. Should match the image in the repository.
