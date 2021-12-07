@@ -63,7 +63,7 @@ class Correlate:
 	def __init__(self, args):
 		print('\n== Preparing correlations\n')
 		cp.read(args.config_file)
-		if args.p is not None: # override configuration file arguments on command line: -p <section>.<arg>=value
+		if args.p is not None: # override configuration file arguments on command line: -p <section>.<arg>=value (values containing . or = will not be processed)
 			print('== Overriding config arguments from command line:')
 			for ap in args.p:
 				s = ap.split('.')[0]
