@@ -1,8 +1,6 @@
 # 2ptPipeline
 2-point statistics pipeline, using TreeCorr, allowing for many correlations in fewer configs, with different cuts/weighting/other choices. Primarily intended for measurement of projected correlations $w(r_p)$, but can also measure angular clustering $w(\theta)$, and recently included non-projected clustering/IA $\xi(r)$ for simulation boxes. skyknife.py defines jackknife regions in catalogues, for covariance estimation. Only FITS catalogue formats are supported.
 
-
-
 Requirements: TreeCorr, astropy, configparser
 
 # Usage
@@ -13,7 +11,7 @@ Basic usage is:
 For details of possible command-line arguments, do:
 > python w_pipeline.py -h
 
-See also the comments in the config.ini file.
+See also the numerous comments in the config.ini file.
 
 # Jackknife usage
 
