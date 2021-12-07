@@ -1,5 +1,5 @@
 # 2ptPipeline
-2-point statistics pipeline, using TreeCorr, allowing for many correlations in fewer configs, with different cuts/weighting/other choices. Primarily intended for measurement of projected correlations $w(r_p)$, but can also measure angular clustering $w(\theta)$. skyknife.py defines jackknife regions in catalogues, for covariance estimation. Only FITS catalogue formats are supported.
+2-point statistics pipeline, using TreeCorr, allowing for many correlations in fewer configs, with different cuts/weighting/other choices. Primarily intended for measurement of projected correlations $w(r_p)$, but can also measure angular clustering $w(\theta)$, and recently included non-projected clustering/IA $\xi(r)$ for simulation boxes. skyknife.py defines jackknife regions in catalogues, for covariance estimation. Only FITS catalogue formats are supported.
 
 # Usage
 
@@ -19,7 +19,7 @@ Using same config file as for w_pipeline.py, run skyknife with:
 And similarly for details, run:
 > python skyknife.py -h
 
-Skyknife should be run against a uniform randoms catalogue before running w_pipeline. Jackknife regions so defined can be exported to other catalogues using the exportto= argument in the config file, as well as column names for 3D coordinates in those files. See additional comments in config.
+Skyknife should be run against a uniform randoms catalogue before running w_pipeline. It is important that the catalogue used for jackknife definition be uniformly distributed, so that regions are driven by area and not density. Jackknife regions so defined can be exported to other catalogues using the exportto= argument in the config file, as well as column names for 3D coordinates in those files. See additional comments in config.
 
 For use of the kmeans clustering routine, clone into this repository https://github.com/esheldon/kmeans_radec and follow the setup instructions, before running skyknife.py with the -kmeans command-line argument.
 
