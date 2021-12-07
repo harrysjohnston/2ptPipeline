@@ -128,10 +128,10 @@ class Jackknife:
 		hdu.writeto(self.catpath, overwrite=1)
 
 		if self.plot and plot:
-			try:
-				self.plot_jackknife()
-			except:
-				print('== %s plotting failed?'%self.catpath)
+			#try:
+			self.plot_jackknife()
+			#except:
+			#	print('== %s plotting failed?'%self.catpath)
 
 		return groups
 
@@ -149,7 +149,10 @@ class Jackknife:
 		if self.do_3d:
 			cat_z = cat[self.z_col]
 			jack_z = [cat_z[cat['jackknife_ID']==i].mean() for i in unique_IDs]
-			small_z = np.sort(jack_z)[:len(unique_IDs)/self.nzbin]
+			if len(unique_IDs) // self.nzbin >= 2:
+				small_z = np.sort(jack_z)[:len(unique_IDs)//self.nzbin]
+			else:
+				small_z = np.sort(jack_z)
 		else:
 			jack_z = np.ones_like(unique_IDs)
 
@@ -466,10 +469,10 @@ class Jackknife:
 				gc.collect()
 
 		if self.plot:
-			try:
-				self.plot_jackknife()
-			except:
-				print('== %s plotting failed?'%self.catpath)
+			#try:
+			self.plot_jackknife()
+			#except:
+			#	print('== %s plotting failed?'%self.catpath)
 
 	def slice_kmeans(self, jk_labels, cat, z_col, zbound=None, nbin=None, zedge=None):
 		if zedge is None:

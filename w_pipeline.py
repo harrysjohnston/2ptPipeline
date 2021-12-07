@@ -245,9 +245,6 @@ class Correlate:
 			if args.bin_slop is not None: tc_proj_config['bin_slop'] = args.bin_slop
 			tc_proj_config['num_threads'] = args.num_threads
 			tc_proj_config['verbose'] = args.verbosity
-			for option in cpd['angular_correlations'].keys():
-				if option == 'default': continue
-				tc_proj_config[option] = cpd['angular_correlations'][option]
 			self.tc_proj_config = tc_proj_config
 			self.gplus_estimator = tc_proj_config['gplus_estimator']
 			self.metric = tc_proj_config['metric']
@@ -255,10 +252,14 @@ class Correlate:
 			if self.period == ['']:
 				assert self.metric != 'Periodic', "must give period of box if specifying periodic boundary conditions!"
 				self.period = None
+				del tc_proj_config['period']
 			elif len(self.period) == 1:
 				self.xperiod = self.yperiod = self.zperiod = float(self.period[0])
-			else:
+			elif len(self.period) == 3:
 				self.xperiod, self.yperiod, self.zperiod = (float(p) for p in self.period)
+			else:
+				self.xperiod = self.yperiod = self.zperiod = None
+				del tc_proj_config['period']
 			
 			self.ra_col = tc_proj_config['ra_col']
 			self.dec_col = tc_proj_config['dec_col']
@@ -308,11 +309,11 @@ class Correlate:
 				del self.tc_proj_config['nbins_rpar']
 			try:
 				self.rpar_edges = np.array([float(i) for i in tc_proj_config['rpar_edges'].replace(' ','').strip("'").strip('"').split(',')])
-				if self.rpar_edges[0] != 0:
-					self.rpar_edges = np.insert(self.rpar_edges, 0, 0.)
-				if not self.rpar_edges.min() < 0:
-					self.rpar_edges = np.append(self.rpar_edges[::-1]*-1., self.rpar_edges[1:])
-				assert 0 in self.rpar_edges, "Pi bins asymmetric!"
+#				if self.rpar_edges[0] != 0:
+#					self.rpar_edges = np.insert(self.rpar_edges, 0, 0.)
+#				if not self.rpar_edges.min() < 0:
+#					self.rpar_edges = np.append(self.rpar_edges[::-1]*-1., self.rpar_edges[1:])
+#				assert 0 in self.rpar_edges, "Pi bins asymmetric!"
 				self.min_rpar = self.rpar_edges.min()
 				self.max_rpar = self.rpar_edges.max()
 				self.nbins_rpar = len(self.rpar_edges) - 1
@@ -449,7 +450,7 @@ class Correlate:
 
 		# loop over Pi-bins collecting w(rp, Pi[p])
 		for p in range(self.nbins_rpar):
-			print('== Pi bin #%s'%(p+1))
+			if args.verbosity >= 2: print('== Pi bin #%s'%(p+1))
 			if self.largePi and any(abs(Pi[p:p+2]) < self.max_rpar): # skip any |Pi| < max_arg
 				continue
 
@@ -565,7 +566,7 @@ class Correlate:
 
 		# loop over Pi-bins collecting w(rp, Pi[p])
 		for p in range(self.nbins_rpar):
-			print('== Pi bin #%s'%(p+1))
+			if args.verbosity >= 2:	print('== Pi bin #%s'%(p+1))
 			if self.largePi and any(abs(Pi[p:p+2]) < self.max_rpar): # skip any |Pi| < max_arg
 				continue
 
@@ -1182,7 +1183,7 @@ if __name__ == '__main__':
 	parser.add_argument(
 		'-verbosity',
 		type=int,
-		default=3,
+		default=1,
 		help='Specify verbosity (int[0,3], default=3) for TreeCorr computations, and reports from this code')
 	parser.add_argument(
 		'-down',
