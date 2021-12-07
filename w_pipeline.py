@@ -299,10 +299,13 @@ class Correlate:
 			try:
 				self.min_rpar = float(tc_proj_config['min_rpar'])
 				self.max_rpar = float(tc_proj_config['max_rpar'])
-				self.nbins_rpar = int(tc_proj_config['nbins_rpar'])
-			except:
+			except ValueError:
 				del self.tc_proj_config['min_rpar']
 				del self.tc_proj_config['max_rpar']
+			try:
+				self.nbins_rpar = int(tc_proj_config['nbins_rpar'])
+			except:
+				del self.tc_proj_config['nbins_rpar']
 			try:
 				self.rpar_edges = np.array([float(i) for i in tc_proj_config['rpar_edges'].replace(' ','').strip("'").strip('"').split(',')])
 				if self.rpar_edges[0] != 0:
@@ -760,23 +763,23 @@ class Correlate:
 		meanr = np.zeros(self.nbins)
 		meanlogr = np.zeros(self.nbins)
 
-		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1)
-		rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1)
+		rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1)#, npatch=27)
+		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1)#, patch_centers=rand1.patch_centers)
 		if not auto:
-			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2)
-			rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, w=rwcol2)
+			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2)#, patch_centers=rand1.patch_centers)
+			rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, w=rwcol2)#, patch_centers=rand1.patch_centers)
 
 		conf = self.tc_proj_config.copy()
-		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod)
+		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod)#, var_method='jackknife')
 		nn = treecorr.NNCorrelation(conf, **p_args)
 		rr = treecorr.NNCorrelation(conf, **p_args)
 		nr = treecorr.NNCorrelation(conf, **p_args)
 		rn = treecorr.NNCorrelation(conf, **p_args)
 
 		if auto:
-			nn.process_cross(data1, data1)
-			rr.process_cross(rand1, rand1)
-			nr.process_cross(data1, rand1)
+			nn.process(data1, data1)
+			rr.process(rand1, rand1)
+			nr.process(data1, rand1)
 			nn.finalize()
 			rr.finalize()
 			nr.finalize()
@@ -785,10 +788,10 @@ class Correlate:
 			else:
 				xi, varxi = nn.calculateXi(rr)
 		else:
-			nn.process_cross(data1, data2)
-			rr.process_cross(rand1, rand2)
-			nr.process_cross(data1, rand2)
-			rn.process_cross(rand1, data2)
+			nn.process(data1, data2)
+			rr.process(rand1, rand2)
+			nr.process(data1, rand2)
+			rn.process(rand1, data2)
 			nn.finalize()
 			rr.finalize()
 			nr.finalize()
@@ -805,12 +808,14 @@ class Correlate:
 		if auto: RD += nr.weight
 		else: RD += rn.weight
 		RR += rr.weight
-		meanr += nn.meanr * nn.weight
-		meanlogr += nn.meanlogr * nn.weight
+		meanr += nn.meanr
+		meanlogr += nn.meanlogr
 
 		r = np.column_stack((nn.rnom, meanr, meanlogr))
 		output = np.column_stack((r, wgg, varw**0.5, DD, DR, RD, RR))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgg','noise','DDpairs','DRpairs','RDpairs','RRpairs')))
+		if hasattr(nn, 'cov'):
+			np.savetxt(outfile.replace('.dat', '.cov'), nn.cov)
 
 		del data1, rand1, nn, nr, rr
 		if not auto:
