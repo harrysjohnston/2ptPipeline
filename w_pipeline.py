@@ -40,6 +40,7 @@ def uhalfcut(arr,q=0):
 		return arr < perc25
 	else:
 		return arr < perc50
+
 def lhalfcut(arr,q=0):
 	# remove the smallest half of parameter <arr>
 	# or smallest quarter, if q=1
@@ -49,14 +50,17 @@ def lhalfcut(arr,q=0):
 		return arr > perc25
 	else:
 		return arr > perc50
+
 def lqcut(arr,q=10.):
 	# remove all parameter <arr> less than quantile <q>
 	perc = np.percentile(nn(arr), q)
 	return arr > perc
+
 def hqcut(arr,q=10.):
 	# remove all parameter <arr> greater than quantile <q>
 	perc = np.percentile(nn(arr), q)
 	return arr < perc
+
 midpoints = lambda x: (x[1:] + x[:-1]) / 2.
 
 class Correlate:
@@ -328,26 +332,35 @@ class Correlate:
 				self.rpar_edges = None
 			self.nbins = int(tc_proj_config['nbins'])
 			self.largePi = int(tc_proj_config['largepi'])
-			if self.coordinates == 'XYZ': print('== Warning: largePi has no meaning for XYZ coordinates!')
+			if self.coordinates == 'XYZ' and self.largePi:
+				print('== Warning: largePi has no meaning for XYZ coordinates!')
 			self.compensated = int(tc_proj_config['compensated'])
 			self.random_oversampling = args.down
 			self.save_3d = int(tc_proj_config['save_3d'])
 
-		self.run_jackknife = int(cp.get('jackknife', 'run', fallback=0))
-		if self.run_jackknife == 1:
-			print("== Run_jackknife = 1 -- performing N jackknife correlations excluding regions N")
-		if self.run_jackknife == 2:
-			print("== Run_jackknife = 2 -- performing jackknife before main correlations")
-		if self.run_jackknife == 3:
-			print("== Run_jackknife = 3 -- performing jackknife after main correlations")
-		if self.run_jackknife == 4:
-			print("== Run_jackknife = 4 -- collecting jackknife covariance only")
-		try:
-			self.jackknife_numbers = [int(i) for i in cp.get('jackknife', 'numbers').split(' ')]
-			print("== jackknife indices specified:")
-			print(self.jackknife_numbers)
-		except:
-			self.jackknife_numbers = None
+		self.treejack = int(cp.get('jackknife', 'treejack', fallback=0))
+		if self.treejack != 0:
+			self.run_jackknife = 0
+			print(f"== Doing TreeCorr jackknife with {self.treejack} patches")
+			if not (all(i == 'wth' for i in corr_types) or (all(j == 'wgg' for j in corr_types) and self.coordinates == 'XYZ')):
+				print(f'==== TreeCorr jackknife not supported for requested correlations:\n{corr_types}')
+				raise ValueError('set jackknife.treejack=0 and use the jackknife.run= argument instead (must externally define a jackknife_ID column)')
+		else:
+			self.run_jackknife = int(cp.get('jackknife', 'run', fallback=0))
+			if self.run_jackknife == 1:
+				print("== Run_jackknife = 1 -- performing N jackknife correlations excluding regions N")
+			if self.run_jackknife == 2:
+				print("== Run_jackknife = 2 -- performing jackknife before main correlations")
+			if self.run_jackknife == 3:
+				print("== Run_jackknife = 3 -- performing jackknife after main correlations")
+			if self.run_jackknife == 4:
+				print("== Run_jackknife = 4 -- collecting jackknife covariance only")
+			try:
+				self.jackknife_numbers = [int(i) for i in cp.get('jackknife', 'numbers').split(' ')]
+				print("== jackknife indices specified:")
+				print(self.jackknife_numbers)
+			except:
+				self.jackknife_numbers = None
 		self.paths_data1 = paths_data1
 		self.paths_data2 = paths_data2
 		self.paths_rand1 = paths_rand1
@@ -366,15 +379,23 @@ class Correlate:
 		self.loop = loop
 
 	def compute_wtheta(self, d1, r1, outfile, auto=True, d2=None, r2=None, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
-		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1)
-		rand1 = treecorr.Catalog(ra=r1[self.ra_col], dec=r1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol1)
-		if not auto:
-			data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol2)
-			rand2 = treecorr.Catalog(ra=r2[self.ra_col], dec=r2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol2)
+		if self.treejack != 0:
+			npatch = self.treejack
+			var_method = 'jackknife'
+		else:
+			npatch = 1
+			var_method = 'shot'
 
-		nn = treecorr.NNCorrelation(self.tc_config)
-		nr = treecorr.NNCorrelation(self.tc_config)
-		rr = treecorr.NNCorrelation(self.tc_config)
+		rand1 = treecorr.Catalog(ra=r1[self.ra_col], dec=r1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol1, npatch=npatch)
+		patch_centers = rand1.patch_centers
+		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1, patch_centers=patch_centers)
+		if not auto:
+			data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol2, patch_centers=patch_centers)
+			rand2 = treecorr.Catalog(ra=r2[self.ra_col], dec=r2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol2, patch_centers=patch_centers)
+
+		nn = treecorr.NNCorrelation(self.tc_config, var_method=var_method)
+		nr = treecorr.NNCorrelation(self.tc_config, var_method=var_method)
+		rr = treecorr.NNCorrelation(self.tc_config, var_method=var_method)
 		if auto:
 			nn.process(data1)
 			rr.process(rand1)
@@ -389,6 +410,12 @@ class Correlate:
 			nn.write(outfile, rr=rr, dr=nr, rd=rn, file_type='ASCII', precision=6)
 		# remove the additional header with correlation details -- these are in the treecorr config file
 		os.system("sed -i '' -e '/##/ { d; }' %s"%outfile)
+
+		if self.treejack != 0 and hasattr(nn, 'cov'):
+			np.savetxt(outfile.replace('.dat', '.cov'), nn.cov)
+			dat = ascii.read(outfile)
+			dat['xi_jackknife_err'] = np.diag(nn.cov)**0.5
+			dat.write(outfile, format='ascii.fast_commented_header', overwrite=1)
 
 		del data1, rand1, nn, nr, rr
 		if not auto:
@@ -755,13 +782,13 @@ class Correlate:
 
 		r = np.column_stack((ng.rnom, meanr, meanlogr))
 		output = np.column_stack((r, gt, gx, varg**0.5, DS, RS))
-		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgplus','wgcross','noise','DSpairs','RSpairs')))
+		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigplus','xigcross','noise','DSpairs','RSpairs')))
 
 		del data1, rand1, data2, rand2, ng, rg
 		gc.collect()
 
 	def compute_xigg_xyz(self, d1, r1, outfile, auto=True, d2=None, r2=None, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
-		wgg = np.zeros(self.nbins)
+		xigg = np.zeros(self.nbins)
 		varw = np.zeros(self.nbins)
 		DD = np.zeros(self.nbins)
 		DR = np.zeros(self.nbins)
@@ -770,14 +797,22 @@ class Correlate:
 		meanr = np.zeros(self.nbins)
 		meanlogr = np.zeros(self.nbins)
 
-		rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1)#, npatch=27)
-		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1)#, patch_centers=rand1.patch_centers)
+		if self.treejack != 0:
+			npatch = self.treejack
+			var_method = 'jackknife'
+		else:
+			npatch = 1
+			var_method = 'shot'
+
+		rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, npatch=npatch)
+		patch_centers = rand1.patch_centers
+		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1, patch_centers=patch_centers)
 		if not auto:
-			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2)#, patch_centers=rand1.patch_centers)
-			rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, w=rwcol2)#, patch_centers=rand1.patch_centers)
+			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2, patch_centers=patch_centers)
+			rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, w=rwcol2, patch_centers=patch_centers)
 
 		conf = self.tc_proj_config.copy()
-		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod)#, var_method='jackknife')
+		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod, var_method=var_method)
 		nn = treecorr.NNCorrelation(conf, **p_args)
 		rr = treecorr.NNCorrelation(conf, **p_args)
 		nr = treecorr.NNCorrelation(conf, **p_args)
@@ -808,7 +843,7 @@ class Correlate:
 			else:
 				xi, varxi = nn.calculateXi(rr)
 
-		wgg += xi
+		xigg += xi
 		varw += varxi
 		DD += nn.weight
 		DR += nr.weight
@@ -819,10 +854,12 @@ class Correlate:
 		meanlogr += nn.meanlogr
 
 		r = np.column_stack((nn.rnom, meanr, meanlogr))
-		output = np.column_stack((r, wgg, varw**0.5, DD, DR, RD, RR))
-		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','wgg','noise','DDpairs','DRpairs','RDpairs','RRpairs')))
-		if hasattr(nn, 'cov'):
+		output = np.column_stack((r, xigg, varw**0.5, DD, DR, RD, RR))
+		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigg','noise','DDpairs','DRpairs','RDpairs','RRpairs')))
+		if self.treejack != 0 and hasattr(nn, 'cov'):
 			np.savetxt(outfile.replace('.dat', '.cov'), nn.cov)
+			output = np.column_stack((r, xigg, varw**0.5, DD, DR, RD, RR, np.diag(nn.cov)**0.5))
+			np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigg','noise','DDpairs','DRpairs','RDpairs','RRpairs','xigg_jackknife_err')))
 
 		del data1, rand1, nn, nr, rr
 		if not auto:
@@ -1115,7 +1152,7 @@ class Correlate:
 			else:
 				return None
 
-	def collect_jackknife(self, columns=['wgplus','wgcross','wgg','xi']):
+	def collect_jackknife(self, columns=['wgplus','wgcross','wgg','xi','xigg','xigplus','xigcross']):
 		# collect-up jackknife measurements and construct
 		# jackknife covariance/add jackknife mean and stderr
 		# columns into main measurement output files
@@ -1132,6 +1169,7 @@ class Correlate:
 			try:
 				jk_data = [self.outfiles[i].replace('.dat', '.jk%s'%jkn) for jkn in jk_numbers]
 			except:
+				print(f'==== jackknife correlations missing for {self.outfiles[i]}? Continuing')
 				continue
 
 			# collect relevant jackknife measurements
@@ -1140,11 +1178,11 @@ class Correlate:
 				try:
 					asc_arr.append(ascii.read(jk))
 				except: # some cuts may not have corresponding jackknife samples
-					print('\n==== %s jackknife missing -- continuing'%jk)
+					print('\n==== %s jackknife read-in failed -- continuing'%jk)
 					continue
 			Njk_i = len(asc_arr)
 			if Njk_i == 0 or Njk_i < self.Njk//2:
-				print('\n==== %s jackknife failed -- skipping'%self.outfiles[i])
+				print('\n==== %s jackknife collection failed -- skipping'%self.outfiles[i])
 				continue
 
 			for col in columns:
@@ -1155,10 +1193,14 @@ class Correlate:
 					try:
 						# jackknife re-norm without weights for now -- assume samples are not too diverse
 						cov = np.cov(data_arr, rowvar=0) * (Njk_i - 1.)**2. / Njk_i
-					except: continue
+					except:
+						print('\n==== %s jackknife collection failed -- skipping'%self.outfiles[i])
+						continue
 					try:
 						stdev = np.sqrt(np.diag(cov))
-					except: continue
+					except:
+						print('\n==== %s jackknife collection failed -- skipping'%self.outfiles[i])
+						continue
 					mean = data_arr.mean(axis=0)
 					data = ascii.read(self.outfiles[i])
 					data['%s_jackknife_err'%col] = stdev

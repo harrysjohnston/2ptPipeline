@@ -27,6 +27,8 @@ For use of the kmeans clustering routine, clone into this repository https://git
   
 Unfortunately never got round to doing something more clever with jackknifes than just looping over the samples and re-measuring each correlation - lots of duplicated computations. If one writes code to somehow track the jackknife_IDs of galaxy pairs, then the jackknife measurements could be assembled after a single run agains the catalogue.
 
+TreeCorr also implements a jackknife routine (though its comparatively similar speed makes me doubt that any such clever counting is being done), which is supported within this pipeline by the config argument jackknife.treejack=N -- requests N subsamples to be defined via kmeans, in 2D (3D) for RADEC (XYZ). This argument will override the jackknife.run= config argument that otherwise governs the jackknife covariance computation, but treejack is only supported for angular correlations w(theta) and Cartesian 3D clustering xi_gg(r) -- this is because the other 2-point functiuons involve auxiliary computations that will render the TreeCorr covariance output meaningless.
+
 # Test installation
 
 Do ./run_tests.sh and expect to see a little plot of w(theta), w_g+, w_gx, and w_gg for a small test sample, after about a minute of computation (16 threads). Should match the image in the repository (values not meaningful).
