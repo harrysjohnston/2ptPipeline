@@ -857,9 +857,16 @@ class Correlate:
 		output = np.column_stack((r, xigg, varw**0.5, DD, DR, RD, RR))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigg','noise','DDpairs','DRpairs','RDpairs','RRpairs')))
 		if self.treejack != 0 and hasattr(nn, 'cov'):
-			np.savetxt(outfile.replace('.dat', '.cov'), nn.cov)
+			# collect TreeCorr jackknife products
+			corrs = [nn]
+			plist = [c._jackknife_pairs() for c in corrs]
+			plist = list(zip(*plist))
+			func = lambda corrs: np.concatenate([c.getStat() for c in corrs])
+			v, w = treecorr.binnedcorr2._make_cov_design_matrix(corrs, plist, func, 'jackknife')
 			output = np.column_stack((r, xigg, varw**0.5, DD, DR, RD, RR, np.diag(nn.cov)**0.5))
 			np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigg','noise','DDpairs','DRpairs','RDpairs','RRpairs','xigg_jackknife_err')))
+			np.savetxt(outfile.replace('.dat', '.cov'), nn.cov)
+			np.savetxt(outfile.replace('.dat', '.jk'), v, header='shape = (N jk samples, N sep-bins)')
 
 		del data1, rand1, nn, nr, rr
 		if not auto:
