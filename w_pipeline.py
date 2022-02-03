@@ -344,7 +344,9 @@ class Correlate:
 			print(f"== Doing TreeCorr jackknife with {self.treejack} patches")
 			if not (all(i == 'wth' for i in corr_types) or (all(j == 'wgg' for j in corr_types) and self.coordinates == 'XYZ')):
 				print(f'==== TreeCorr jackknife not supported for requested correlations:\n{corr_types}')
-				raise ValueError('set jackknife.treejack=0 and use the jackknife.run= argument instead (must externally define a jackknife_ID column)')
+				raise ValueError('set jackknife.treejack=0 and use the jackknife.run= argument instead (must externally define a jackknife_ID column)'
+								 '\nAvoid using external jackknife_ID when doing periodic boundaries')
+			self.treejack_save = cp.get('jackknife', 'treejack_save', fallback=None)
 		else:
 			self.run_jackknife = int(cp.get('jackknife', 'run', fallback=0))
 			if self.run_jackknife == 1:
@@ -386,8 +388,14 @@ class Correlate:
 			npatch = 1
 			var_method = 'shot'
 
-		rand1 = treecorr.Catalog(ra=r1[self.ra_col], dec=r1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol1, npatch=npatch)
-		patch_centers = rand1.patch_centers
+		if self.treejack != 0 and self.treejack_save and os.path.exists(self.treejack_save):
+			rand1 = treecorr.Catalog(ra=r1[self.ra_col], dec=r1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol1, patch_centers=self.treejack_save)
+			patch_centers = self.treejack_save
+		else:
+			rand1 = treecorr.Catalog(ra=r1[self.ra_col], dec=r1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol1, npatch=npatch)
+			patch_centers = rand1.patch_centers
+			if self.treejack_save:
+				rand1.write_patch_centers(self.treejack_save)
 		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1, patch_centers=patch_centers)
 		if not auto:
 			data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol2, patch_centers=patch_centers)
@@ -804,8 +812,14 @@ class Correlate:
 			npatch = 1
 			var_method = 'shot'
 
-		rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, npatch=npatch)
-		patch_centers = rand1.patch_centers
+		if self.treejack != 0 and self.treejack_save and os.path.exists(self.treejack_save):
+			rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, patch_centers=self.treejack_save)
+			patch_centers = self.treejack_save
+		else:
+			rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, npatch=npatch)
+			patch_centers = rand1.patch_centers
+			if self.treejack_save:
+				rand1.write_patch_centers(self.treejack_save)
 		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1, patch_centers=patch_centers)
 		if not auto:
 			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2, patch_centers=patch_centers)
