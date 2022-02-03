@@ -1229,8 +1229,8 @@ if __name__ == '__main__':
 	parser.add_argument(
 		'--num-threads',
 		type=int,
-		default=16,
-		help='Specify number of threads to employ (default=16)')
+		default=8,
+		help='Specify number of threads to employ (default=8)')
 	parser.add_argument(
 		'--save-cats',
 		action='store_true',
