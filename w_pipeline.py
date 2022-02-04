@@ -132,18 +132,27 @@ class Correlate:
 			if args.verbosity >= 1: print('== Randoms(2) weighting (rand_weights2) not set; assuming unit weights for all')
 			rand_weights2 = ['ones']
 
+		self.supported_corrs = ['wth', 'wgp', 'wgg', 'xigg', 'xigp', 'xigk', 'xikk']
+		self.always_cross = ['wgp', 'xigp', 'xigk']
 		if corr_types in [[''], []]:
 			print('== Correlation types (corr_types) not set; assuming angular clustering for all')
 			corr_types = ['wth'] * len(paths_data1)
 		else:
-			if corr_types[-1] == '': corr_types = corr_types[:-1]
-			assert all([ct in ['wth', 'wgp', 'wgg'] for ct in corr_types]), ("must specify corr_types as 'wth' (angular clust.), "
-																			"'wgg' (proj. clust.) or 'wgp' (proj. direct IA) per correlation "
-																			 "-- can add more correlations on request")
-			assert not ('wth' in corr_types and ('wgg' in corr_types or 'wgp' in corr_types)), \
-				"must currently use separate config files for angluar and projected correlations"
+			corr_types = [ct for ct in corr_types if ct != '']
+			assert all([ct in self.supported_corrs for ct in corr_types]), \
+					("must specify corr_types by choosing from:"
+					 "\n'wth' (angular clustering)"
+					 "\n'wgg' (proj. clustering)"
+					 "\n'wgp' (proj. density-shear)"
+					 "\n'xigg' (3D clustering, currently only supported for XYZ)"
+					 "\n'xigp' (3D density-shear, currently only supported for XYZ)"
+					 "\n'xikk' (3D scalar-scalar, currently only supported for XYZ)\n"
+					 "\n'xigk' (3D density-scalar, currently only supported for XYZ)"
+					 "-- can add more correlations on request")
 		angular_corrs = 'wth' in corr_types
-		projected_corrs = 'wgg' in corr_types or 'wgp' in corr_types
+		projected_corrs = any(corr in corr_types for corr in ('wgp','wgg'))
+		threedim_corrs = any(corr in corr_types for corr in ('xigg','xigp','xigk','xikk'))
+		assert sum((angular_corrs, projected_corrs, threedim_corrs)) == 1, "Please use different config files for angular, projected, and 3D correlations"
 
 		# copy paths arguments if no second set of paths specified
 		if paths_data2 in [[''], []]:
@@ -249,7 +258,7 @@ class Correlate:
 			self.tc_config = tc_config
 			self.coordinates = 'RADEC'
 
-		if projected_corrs:
+		if projected_corrs or threedim_corrs:
 			tc_proj_config = cpd['projected_correlations']
 			if args.bin_slop is not None: tc_proj_config['bin_slop'] = args.bin_slop
 			tc_proj_config['num_threads'] = args.num_threads
@@ -306,6 +315,7 @@ class Correlate:
 			self.flip_g2 = int(tc_proj_config['flip_g2'])
 			self.fg1 = (1., -1.)[self.flip_g1]
 			self.fg2 = (1., -1.)[self.flip_g2]
+			self.k_col = tc_proj_config['k_col']
 			try:
 				self.min_rpar = float(tc_proj_config['min_rpar'])
 				self.max_rpar = float(tc_proj_config['max_rpar'])
@@ -329,6 +339,8 @@ class Correlate:
 				print("== Specified (line-of-sight) Pi-binning (units of r_col):")
 				print(self.rpar_edges)
 			except:
+				if projected_corrs:
+					print('== rpar edges not specified; computing from min/max/nbin_rpar')
 				self.rpar_edges = None
 			self.nbins = int(tc_proj_config['nbins'])
 			self.largePi = int(tc_proj_config['largepi'])
@@ -342,12 +354,15 @@ class Correlate:
 		if self.treejack != 0:
 			self.run_jackknife = 0
 			print(f"== Doing TreeCorr jackknife with {self.treejack} patches")
-			if not (all(i == 'wth' for i in corr_types) or (all(j == 'wgg' for j in corr_types) and self.coordinates == 'XYZ')):
+			if self.coordinates == 'XYZ' and not all('xi' in i for i in corr_types):
 				print(f'==== TreeCorr jackknife not supported for requested correlations:\n{corr_types}')
 				raise ValueError('set jackknife.treejack=0 and use the jackknife.run= argument instead (must externally define a jackknife_ID column)'
 								 '\nAvoid using external jackknife_ID when doing periodic boundaries')
 			self.treejack_save = cp.get('jackknife', 'treejack_save', fallback=None)
+			if self.treejack_save:
+				print(f"== Saving/loading TreeCorr jackknife patches to/from {self.treejack_save}")
 		else:
+			self.treejack_save = None
 			self.run_jackknife = int(cp.get('jackknife', 'run', fallback=0))
 			if self.run_jackknife == 1:
 				print("== Run_jackknife = 1 -- performing N jackknife correlations excluding regions N")
@@ -448,7 +463,7 @@ class Correlate:
 		meanlogr_3D = np.zeros([self.nbins_rpar, self.nbins])
 
 		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1,
-								 r=d1[self.r_col])#, g1=d1[self.g1_col] * self.fg1, g2=d1[self.g2_col] * self.fg2)
+								 r=d1[self.r_col])
 		data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol2,
 								 r=d2[self.r_col], g1=d2[self.g1_col] * self.fg1, g2=d2[self.g2_col] * self.fg2)
 		rand1 = treecorr.Catalog(ra=r1[self.rand_ra_col], dec=r1[self.rand_dec_col], ra_units=self.ra_units, dec_units=self.dec_units,
@@ -510,7 +525,7 @@ class Correlate:
 			if self.gplus_estimator == 'PW1': # RDs (rg) norm
 				norm1 = rg.weight * rgw
 				norm2 = rg.weight
-			if self.gplus_estimator == 'PW2': # RRs (rr) norm
+			elif self.gplus_estimator == 'PW2': # RRs (rr) norm
 				rr = treecorr.NNCorrelation(conf_pi)
 				rr.process_cross(rand1, rand2)
 				norm1 = rr.weight * rrw
@@ -758,13 +773,12 @@ class Correlate:
 		ng.process_cross(data1, data2)
 		rg.process_cross(rand1, data2)
 		ng.varxi = varg
-		ng.varxi = varg
 
 		# calculate appropriate normalisation of terms for chosen gplus_estimator
 		if self.gplus_estimator == 'PW1': # RDs (rg) norm
 			norm1 = rg.weight * rgw
 			norm2 = rg.weight
-		if self.gplus_estimator == 'PW2': # RRs (rr) norm
+		elif self.gplus_estimator == 'PW2': # RRs (rr) norm
 			rr = treecorr.NNCorrelation(conf)
 			rr.process_cross(rand1, rand2)
 			norm1 = rr.weight * rrw
@@ -887,6 +901,138 @@ class Correlate:
 			del data2, rand2, rn
 		gc.collect()
 
+	def compute_xikk_xyz(self, d1, r1, outfile, auto=True, d2=None, r2=None, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
+		xikk = np.zeros(self.nbins)
+		varw = np.zeros(self.nbins)
+		KK = np.zeros(self.nbins)
+		meanr = np.zeros(self.nbins)
+		meanlogr = np.zeros(self.nbins)
+
+		if self.treejack != 0:
+			npatch = self.treejack
+			var_method = 'jackknife'
+		else:
+			npatch = 1
+			var_method = 'shot'
+
+		if self.treejack != 0 and self.treejack_save and os.path.exists(self.treejack_save):
+			data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], k=d1[self.k_col], w=wcol1, patch_centers=self.treejack_save)
+			patch_centers = self.treejack_save
+		else:
+			data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], k=d1[self.k_col], w=wcol1, npatch=npatch)
+			patch_centers = data1.patch_centers
+			if self.treejack_save:
+				data1.write_patch_centers(self.treejack_save)
+		if not auto:
+			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], k=d2[self.k_col], w=wcol2, patch_centers=patch_centers)
+
+		conf = self.tc_proj_config.copy()
+		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod, var_method=var_method)
+		kk = treecorr.KKCorrelation(conf, **p_args)
+
+		if auto:
+			kk.process(data1, data1)
+		else:
+			kk.process(data1, data2)
+		kk.finalize()
+
+		xikk += kk.xi
+		varw += kk.varxi
+		KK += kk.weight
+		meanr += kk.meanr
+		meanlogr += kk.meanlogr
+
+		r = np.column_stack((kk.rnom, meanr, meanlogr))
+		output = np.column_stack((r, xikk, varw**0.5, KK))
+		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xikk','noise','KKpairs')))
+		if self.treejack != 0 and hasattr(kk, 'cov'):
+			# collect TreeCorr jackknife products
+			corrs = [kk]
+			plist = [c._jackknife_pairs() for c in corrs]
+			plist = list(zip(*plist))
+			func = lambda corrs: np.concatenate([c.getStat() for c in corrs])
+			v, w = treecorr.binnedcorr2._make_cov_design_matrix(corrs, plist, func, 'jackknife')
+			output = np.column_stack((r, xikk, varw**0.5, KK, np.diag(kk.cov)**0.5))
+			np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xikk','noise','KKpairs','xikk_jackknife_err')))
+			np.savetxt(outfile.replace('.dat', '.cov'), kk.cov)
+			np.savetxt(outfile.replace('.dat', '.jk'), v, header='shape = (N jk samples, N sep-bins)')
+
+		del data1, kk
+		if not auto:
+			del data2
+		gc.collect()
+
+	def compute_xigk_xyz(self, d1, r1, d2, r2, outfile, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
+		xigk = np.zeros(self.nbins)
+		varxi = np.zeros(self.nbins)
+		DK = np.zeros(self.nbins)
+		RK = np.zeros(self.nbins)
+		RR = np.zeros(self.nbins)
+		meanr = np.zeros(self.nbins)
+		meanlogr = np.zeros(self.nbins)
+
+		if self.treejack != 0:
+			npatch = self.treejack
+			var_method = 'jackknife'
+		else:
+			npatch = 1
+			var_method = 'shot'
+
+		if self.treejack != 0 and self.treejack_save and os.path.exists(self.treejack_save):
+			rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, patch_centers=self.treejack_save)
+			patch_centers = self.treejack_save
+		else:
+			rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, patch_centers=npatch)
+			patch_centers = rand1.patch_centers
+			if self.treejack_save:
+				rand1.write_patch_centers(self.treejack_save)
+		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1, patch_centers=patch_centers)
+		data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2, k=d2[self.k_col], patch_centers=patch_centers)
+		rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, patch_centers=patch_centers)
+
+		conf = self.tc_proj_config.copy()
+		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod)
+		nk = treecorr.NKCorrelation(conf, **p_args)
+		rk = treecorr.NKCorrelation(conf, **p_args)
+		rr = treecorr.NNCorrelation(conf, **p_args)
+		nk.process_cross(data1, data2)
+		rk.process_cross(rand1, data2)
+		rr.process_cross(rand1, rand2)
+
+		# subtract randoms correlations
+		if self.compensated:
+			nk.calculateXi(rk)
+		else: # or not
+			nk.calculateXi()
+		nk.finalize()
+
+		# include RR normalisation here?
+
+		DK += nk.weight
+		RK += rk.weight
+		RR += rr.weight
+		meanr += nk.meanr
+		meanlogr += nk.meanlogr
+		varxi += nk.varxi
+
+		r = np.column_stack((nk.rnom, meanr, meanlogr))
+		output = np.column_stack((r, xigk, varxi**0.5, DK, RK, RR))
+		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigk','noise','DKpairs','RKpairs','RRpairs')))
+		if self.treejack != 0 and hasattr(nk, 'cov'):
+			# collect TreeCorr jackknife products
+			corrs = [nk]
+			plist = [c._jackknife_pairs() for c in corrs]
+			plist = list(zip(*plist))
+			func = lambda corrs: np.concatenate([c.getStat() for c in corrs])
+			v, w = treecorr.binnedcorr2._make_cov_design_matrix(corrs, plist, func, 'jackknife')
+			output = np.column_stack((r, xigk, varxi**0.5, DK, RK, RR, np.diag(nk.cov)**0.5))
+			np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigk','noise','DKpairs','RKpairs','RRpairs','xigk_jackknife_err')))
+			np.savetxt(outfile.replace('.dat', '.cov'), nk.cov)
+			np.savetxt(outfile.replace('.dat', '.jk'), v, header='shape = (N jk samples, N sep-bins)')
+
+		del data1, rand1, data2, rand2, nk, rk, rr
+		gc.collect()
+
 	def run_loop(self, args, run_jackknife=0, jk_number=0):
 
 		# skip jackknife measurements, if specified
@@ -915,7 +1061,7 @@ class Correlate:
 					self.rand_cuts1[i] == self.rand_cuts2[i] and
 					self.data_weights1[i] == self.data_weights2[i] and
 					self.rand_weights1[i] == self.rand_weights2[i] and
-					self.corr_types[i] != 'wgp'):
+					self.corr_types[i] not in self.always_cross):
 				auto = False
 			else:
 				auto = True
@@ -1148,19 +1294,25 @@ class Correlate:
 			else:
 				outfile = self.outfiles[i]
 
-			# perform correlation
+			# perform correlation -- need to generalise these functions to do projected/3D in RADEC/XYZ
 			if self.corr_types[i] == 'wth':
 				self.compute_wtheta(d1, r1, outfile, auto=auto, d2=d2, r2=r2, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
-			if self.coordinates == 'RADEC':
+			elif self.coordinates == 'RADEC':
 				if self.corr_types[i] == 'wgp':
 					self.compute_wgplus(d1, r1, d2, r2, outfile, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
 				if self.corr_types[i] == 'wgg':
 					self.compute_wgg(d1, r1, outfile, auto=auto, d2=d2, r2=r2, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
-			if self.coordinates == 'XYZ':
-				if self.corr_types[i] == 'wgp':
+			elif self.coordinates == 'XYZ':
+				if self.corr_types[i] == 'xigp':
 					self.compute_xigplus_xyz(d1, r1, d2, r2, outfile, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
-				if self.corr_types[i] == 'wgg':
+				if self.corr_types[i] == 'xigg':
 					self.compute_xigg_xyz(d1, r1, outfile, auto=auto, d2=d2, r2=r2, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
+				if self.corr_types[i] == 'xikk':
+					self.compute_xikk_xyz(d1, r1, outfile, auto=auto, d2=d2, r2=r2, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
+				if self.corr_types[i] == 'xigk':
+					self.compute_xigk_xyz(d1, r1, d2, r2, outfile, wcol1=wcol1, wcol2=wcol2, rwcol1=rwcol1, rwcol2=rwcol2)
+			else:
+				print(f'===== {self.outfiles[i]}: correlation {self.corr_types[i]} w/ coordinates {self.coordinates} not suported')
 
 			# clean up
 			del d1, d2, r1, r2, fits_cats
@@ -1173,7 +1325,7 @@ class Correlate:
 			else:
 				return None
 
-	def collect_jackknife(self, columns=['wgplus','wgcross','wgg','xi','xigg','xigplus','xigcross']):
+	def collect_jackknife(self, columns=['wgplus','wgcross','wgg','xi','xigg','xigplus','xigcross','xigk','xikk']):
 		# collect-up jackknife measurements and construct
 		# jackknife covariance/add jackknife mean and stderr
 		# columns into main measurement output files
@@ -1228,8 +1380,6 @@ class Correlate:
 					data['%s_jackknife_mean'%col] = mean
 					data.write(self.outfiles[i], format='ascii.commented_header', overwrite=1)
 					np.savetxt(self.outfiles[i].replace('.dat', '_%s.cov'%col), cov, header='Njk = %s'%Njk_i)
-
-	#def assemble_jackknife_signals()
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
