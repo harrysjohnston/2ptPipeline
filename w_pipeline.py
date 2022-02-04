@@ -146,7 +146,7 @@ class Correlate:
 					 "\n'wgp' (proj. density-shear)"
 					 "\n'xigg' (3D clustering, currently only supported for XYZ)"
 					 "\n'xigp' (3D density-shear, currently only supported for XYZ)"
-					 "\n'xikk' (3D scalar-scalar, currently only supported for XYZ)\n"
+					 "\n'xikk' (3D scalar-scalar, currently only supported for XYZ)"
 					 "\n'xigk' (3D density-scalar, currently only supported for XYZ)"
 					 "-- can add more correlations on request")
 		angular_corrs = 'wth' in corr_types
@@ -315,7 +315,9 @@ class Correlate:
 			self.flip_g2 = int(tc_proj_config['flip_g2'])
 			self.fg1 = (1., -1.)[self.flip_g1]
 			self.fg2 = (1., -1.)[self.flip_g2]
-			self.k_col = tc_proj_config['k_col']
+			self.k1_col = tc_proj_config['k1_col']
+			self.k2_col = tc_proj_config['k2_col']
+			
 			try:
 				self.min_rpar = float(tc_proj_config['min_rpar'])
 				self.max_rpar = float(tc_proj_config['max_rpar'])
@@ -916,15 +918,15 @@ class Correlate:
 			var_method = 'shot'
 
 		if self.treejack != 0 and self.treejack_save and os.path.exists(self.treejack_save):
-			data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], k=d1[self.k_col], w=wcol1, patch_centers=self.treejack_save)
+			data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], k=d1[self.k1_col], w=wcol1, patch_centers=self.treejack_save)
 			patch_centers = self.treejack_save
 		else:
-			data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], k=d1[self.k_col], w=wcol1, npatch=npatch)
+			data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], k=d1[self.k1_col], w=wcol1, npatch=npatch)
 			patch_centers = data1.patch_centers
 			if self.treejack_save:
 				data1.write_patch_centers(self.treejack_save)
 		if not auto:
-			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], k=d2[self.k_col], w=wcol2, patch_centers=patch_centers)
+			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], k=d2[self.k2_col], w=wcol2, patch_centers=patch_centers)
 
 		conf = self.tc_proj_config.copy()
 		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod, var_method=var_method)
@@ -987,7 +989,7 @@ class Correlate:
 			if self.treejack_save:
 				rand1.write_patch_centers(self.treejack_save)
 		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1, patch_centers=patch_centers)
-		data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2, k=d2[self.k_col], patch_centers=patch_centers)
+		data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2, k=d2[self.k2_col], patch_centers=patch_centers)
 		rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, patch_centers=patch_centers)
 
 		conf = self.tc_proj_config.copy()
