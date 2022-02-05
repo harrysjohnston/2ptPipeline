@@ -984,7 +984,7 @@ class Correlate:
 			rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, patch_centers=self.treejack_save)
 			patch_centers = self.treejack_save
 		else:
-			rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, patch_centers=npatch)
+			rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, npatch=npatch)
 			patch_centers = rand1.patch_centers
 			if self.treejack_save:
 				rand1.write_patch_centers(self.treejack_save)
