@@ -397,26 +397,27 @@ class Correlate:
 		self.outfiles = outfiles
 		self.loop = loop
 
-	def compute_wtheta(self, d1, r1, outfile, auto=True, d2=None, r2=None, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
+	def get_catalog_args(self):
 		if self.treejack != 0:
-			npatch = self.treejack
 			var_method = 'jackknife'
+			if self.treejack_save and os.path.exists(self.treejack_save):
+				kw = {'patch_centers':self.treejack_save}
+			else:
+				kw = {'npatch':self.treejack}
 		else:
-			npatch = 1
 			var_method = 'shot'
+			kw = {'npatch':1}
+		return kw, var_method
 
-		if self.treejack != 0 and self.treejack_save and os.path.exists(self.treejack_save):
-			rand1 = treecorr.Catalog(ra=r1[self.ra_col], dec=r1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol1, patch_centers=self.treejack_save)
-			patch_centers = self.treejack_save
-		else:
-			rand1 = treecorr.Catalog(ra=r1[self.ra_col], dec=r1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol1, npatch=npatch)
-			patch_centers = rand1.patch_centers
-			if self.treejack_save:
-				rand1.write_patch_centers(self.treejack_save)
-		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1, patch_centers=patch_centers)
+	def compute_wtheta(self, d1, r1, outfile, auto=True, d2=None, r2=None, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
+		kw, var_method = self.get_catalog_args()
+		rand1 = treecorr.Catalog(ra=r1[self.ra_col], dec=r1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol1, **kw)
+		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1, patch_centers=rand1.patch_centers)
 		if not auto:
-			data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol2, patch_centers=patch_centers)
-			rand2 = treecorr.Catalog(ra=r2[self.ra_col], dec=r2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol2, patch_centers=patch_centers)
+			data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol2, patch_centers=rand1.patch_centers)
+			rand2 = treecorr.Catalog(ra=r2[self.ra_col], dec=r2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, is_rand=1, w=rwcol2, patch_centers=rand1.patch_centers)
+		if self.treejack != 0 and self.treejack_save and not os.path.exists(self.treejack_save):
+			rand1.write_patch_centers(self.treejack_save)
 
 		nn = treecorr.NNCorrelation(self.tc_config, var_method=var_method)
 		nr = treecorr.NNCorrelation(self.tc_config, var_method=var_method)
@@ -464,14 +465,11 @@ class Correlate:
 		meanr_3D = np.zeros([self.nbins_rpar, self.nbins])
 		meanlogr_3D = np.zeros([self.nbins_rpar, self.nbins])
 
-		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1,
-								 r=d1[self.r_col])
-		data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol2,
-								 r=d2[self.r_col], g1=d2[self.g1_col] * self.fg1, g2=d2[self.g2_col] * self.fg2)
-		rand1 = treecorr.Catalog(ra=r1[self.rand_ra_col], dec=r1[self.rand_dec_col], ra_units=self.ra_units, dec_units=self.dec_units,
-								 r=r1[self.rand_r_col], is_rand=1, w=rwcol1)
-		rand2 = treecorr.Catalog(ra=r2[self.rand_ra_col], dec=r2[self.rand_dec_col], ra_units=self.ra_units, dec_units=self.dec_units,
-								 r=r2[self.rand_r_col], is_rand=1, w=rwcol2)
+		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol1, r=d1[self.r_col])
+		data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], ra_units=self.ra_units, dec_units=self.dec_units, w=wcol2, r=d2[self.r_col],
+								 g1=d2[self.g1_col] * self.fg1, g2=d2[self.g2_col] * self.fg2)
+		rand1 = treecorr.Catalog(ra=r1[self.rand_ra_col], dec=r1[self.rand_dec_col], ra_units=self.ra_units, dec_units=self.dec_units, r=r1[self.rand_r_col], is_rand=1, w=rwcol1)
+		rand2 = treecorr.Catalog(ra=r2[self.rand_ra_col], dec=r2[self.rand_dec_col], ra_units=self.ra_units, dec_units=self.dec_units, r=r2[self.rand_r_col], is_rand=1, w=rwcol2)
 		varg = treecorr.calculateVarG(data2)
 
 
@@ -611,15 +609,11 @@ class Correlate:
 		meanr_3D = np.zeros([self.nbins_rpar, self.nbins])
 		meanlogr_3D = np.zeros([self.nbins_rpar, self.nbins])
 
-		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], r=d1[self.r_col], w=wcol1,
-								 ra_units=self.ra_units, dec_units=self.dec_units)
-		rand1 = treecorr.Catalog(ra=r1[self.rand_ra_col], dec=r1[self.rand_dec_col], r=r1[self.rand_r_col], is_rand=1, w=rwcol1,
-								 ra_units=self.ra_units, dec_units=self.dec_units)
+		data1 = treecorr.Catalog(ra=d1[self.ra_col], dec=d1[self.dec_col], r=d1[self.r_col], w=wcol1, ra_units=self.ra_units, dec_units=self.dec_units)
+		rand1 = treecorr.Catalog(ra=r1[self.rand_ra_col], dec=r1[self.rand_dec_col], r=r1[self.rand_r_col], is_rand=1, w=rwcol1, ra_units=self.ra_units, dec_units=self.dec_units)
 		if not auto:
-			data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], r=d2[self.r_col], w=wcol2,
-									 ra_units=self.ra_units, dec_units=self.dec_units)
-			rand2 = treecorr.Catalog(ra=r2[self.rand_ra_col], dec=r2[self.rand_dec_col], r=r2[self.rand_r_col], is_rand=1, w=rwcol2,
-									 ra_units=self.ra_units, dec_units=self.dec_units)
+			data2 = treecorr.Catalog(ra=d2[self.ra_col], dec=d2[self.dec_col], r=d2[self.r_col], w=wcol2, ra_units=self.ra_units, dec_units=self.dec_units)
+			rand2 = treecorr.Catalog(ra=r2[self.rand_ra_col], dec=r2[self.rand_dec_col], r=r2[self.rand_r_col], is_rand=1, w=rwcol2, ra_units=self.ra_units, dec_units=self.dec_units)
 
 		# loop over Pi-bins collecting w(rp, Pi[p])
 		for p in range(self.nbins_rpar):
@@ -812,34 +806,14 @@ class Correlate:
 		gc.collect()
 
 	def compute_xigg_xyz(self, d1, r1, outfile, auto=True, d2=None, r2=None, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
-		xigg = np.zeros(self.nbins)
-		varw = np.zeros(self.nbins)
-		DD = np.zeros(self.nbins)
-		DR = np.zeros(self.nbins)
-		RD = np.zeros(self.nbins)
-		RR = np.zeros(self.nbins)
-		meanr = np.zeros(self.nbins)
-		meanlogr = np.zeros(self.nbins)
-
-		if self.treejack != 0:
-			npatch = self.treejack
-			var_method = 'jackknife'
-		else:
-			npatch = 1
-			var_method = 'shot'
-
-		if self.treejack != 0 and self.treejack_save and os.path.exists(self.treejack_save):
-			rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, patch_centers=self.treejack_save)
-			patch_centers = self.treejack_save
-		else:
-			rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, npatch=npatch)
-			patch_centers = rand1.patch_centers
-			if self.treejack_save:
-				rand1.write_patch_centers(self.treejack_save)
-		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1, patch_centers=patch_centers)
+		kw, var_method = self.get_catalog_args()
+		rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, **kw)
+		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1, patch_centers=rand1.patch_centers)
 		if not auto:
-			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2, patch_centers=patch_centers)
-			rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, w=rwcol2, patch_centers=patch_centers)
+			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2, patch_centers=rand1.patch_centers)
+			rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, w=rwcol2, patch_centers=rand1.patch_centers)
+		if self.treejack != 0 and self.treejack_save and not os.path.exists(self.treejack_save):
+			rand1.write_patch_centers(self.treejack_save)
 
 		conf = self.tc_proj_config.copy()
 		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod, var_method=var_method)
@@ -852,50 +826,44 @@ class Correlate:
 			nn.process(data1, data1)
 			rr.process(rand1, rand1)
 			nr.process(data1, rand1)
-			nn.finalize()
-			rr.finalize()
-			nr.finalize()
 			if self.compensated:
-				xi, varxi = nn.calculateXi(rr, dr=nr)
+				xigg, varxi = nn.calculateXi(rr, dr=nr)
 			else:
-				xi, varxi = nn.calculateXi(rr)
+				xigg, varxi = nn.calculateXi(rr)
 		else:
 			nn.process(data1, data2)
 			rr.process(rand1, rand2)
 			nr.process(data1, rand2)
 			rn.process(rand1, data2)
-			nn.finalize()
-			rr.finalize()
-			nr.finalize()
-			rn.finalize()
 			if self.compensated:
-				xi, varxi = nn.calculateXi(rr, dr=nr, rd=rn)
+				xigg, varxi = nn.calculateXi(rr, dr=nr, rd=rn)
 			else:
-				xi, varxi = nn.calculateXi(rr)
+				xigg, varxi = nn.calculateXi(rr)
 
-		xigg += xi
-		varw += varxi
-		DD += nn.weight
-		DR += nr.weight
-		if auto: RD += nr.weight
-		else: RD += rn.weight
-		RR += rr.weight
-		meanr += nn.meanr
-		meanlogr += nn.meanlogr
+		DD = nn.weight
+		DR = nr.weight
+		if auto: RD = nr.weight
+		else: RD = rn.weight
+		RR = rr.weight
+		meanr = nn.meanr
+		meanlogr = nn.meanlogr
 
 		r = np.column_stack((nn.rnom, meanr, meanlogr))
-		output = np.column_stack((r, xigg, varw**0.5, DD, DR, RD, RR))
+		output = np.column_stack((r, xigg, varxi**0.5, DD, DR, RD, RR))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigg','noise','DDpairs','DRpairs','RDpairs','RRpairs')))
-		if self.treejack != 0 and hasattr(nn, 'cov'):
+		if self.treejack != 0:
 			# collect TreeCorr jackknife products
 			corrs = [nn]
 			plist = [c._jackknife_pairs() for c in corrs]
 			plist = list(zip(*plist))
 			func = lambda corrs: np.concatenate([c.getStat() for c in corrs])
 			v, w = treecorr.binnedcorr2._make_cov_design_matrix(corrs, plist, func, 'jackknife')
-			output = np.column_stack((r, xigg, varw**0.5, DD, DR, RD, RR, np.diag(nn.cov)**0.5))
+			vmean = np.mean(v, axis=0)
+			v -= vmean
+			C = (1.-1./len(v)) * v.conj().T.dot(v)
+			output = np.column_stack((r, xigg, varxi**0.5, DD, DR, RD, RR, np.diag(C)**0.5))
 			np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigg','noise','DDpairs','DRpairs','RDpairs','RRpairs','xigg_jackknife_err')))
-			np.savetxt(outfile.replace('.dat', '.cov'), nn.cov)
+			np.savetxt(outfile.replace('.dat', '.cov'), C)
 			np.savetxt(outfile.replace('.dat', '.jk'), v, header='shape = (N jk samples, N sep-bins)')
 
 		del data1, rand1, nn, nr, rr
@@ -904,132 +872,120 @@ class Correlate:
 		gc.collect()
 
 	def compute_xikk_xyz(self, d1, r1, outfile, auto=True, d2=None, r2=None, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
-		xikk = np.zeros(self.nbins)
-		varw = np.zeros(self.nbins)
-		KK = np.zeros(self.nbins)
-		meanr = np.zeros(self.nbins)
-		meanlogr = np.zeros(self.nbins)
-
-		if self.treejack != 0:
-			npatch = self.treejack
-			var_method = 'jackknife'
-		else:
-			npatch = 1
-			var_method = 'shot'
-
-		if self.treejack != 0 and self.treejack_save and os.path.exists(self.treejack_save):
-			data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], k=d1[self.k1_col], w=wcol1, patch_centers=self.treejack_save)
-			patch_centers = self.treejack_save
-		else:
-			data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], k=d1[self.k1_col], w=wcol1, npatch=npatch)
-			patch_centers = data1.patch_centers
-			if self.treejack_save:
-				data1.write_patch_centers(self.treejack_save)
+		if self.k1_col != self.k2_col:
+			auto = False
+		kw, var_method = self.get_catalog_args()
+		rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, **kw)
+		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], k=d1[self.k1_col], w=wcol1, patch_centers=rand1.patch_centers)
 		if not auto:
-			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], k=d2[self.k2_col], w=wcol2, patch_centers=patch_centers)
+			rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, w=rwcol2, patch_centers=rand1.patch_centers)
+			data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], k=d2[self.k2_col], w=wcol2, patch_centers=rand1.patch_centers)
+		else:
+			data2 = data1
+			rand2 = rand1
+		if self.treejack != 0 and self.treejack_save and not os.path.exists(self.treejack_save):
+			rand1.write_patch_centers(self.treejack_save)
 
 		conf = self.tc_proj_config.copy()
 		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod, var_method=var_method)
 		kk = treecorr.KKCorrelation(conf, **p_args)
-
+		nn = treecorr.NNCorrelation(conf, **p_args)
+		rr = treecorr.NNCorrelation(conf, **p_args)
 		if auto:
-			kk.process(data1, data1)
+			kk.process(data1)
+			nn.process(data1)
+			rr.process(rand1)
 		else:
 			kk.process(data1, data2)
-		kk.finalize()
+			nn.process(data1, data2)
+			rr.process(rand1, rand2)
 
-		xikk += kk.xi
-		varw += kk.varxi
-		KK += kk.weight
-		meanr += kk.meanr
-		meanlogr += kk.meanlogr
+		xikk = kk.xi * kk.weight / (rr.weight * nn.tot / rr.tot)
+
+		varxi = kk.varxi
+		KK = kk.weight
+		RR = rr.weight
+		meanr = kk.meanr
+		meanlogr = kk.meanlogr
 
 		r = np.column_stack((kk.rnom, meanr, meanlogr))
-		output = np.column_stack((r, xikk, varw**0.5, KK))
-		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xikk','noise','KKpairs')))
-		if self.treejack != 0 and hasattr(kk, 'cov'):
+		output = np.column_stack((r, xikk, varxi**0.5, kk.xi, KK, RR))
+		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xikk','noise','KKraw','KKpairs', 'RRpairs')))
+		if self.treejack != 0:
 			# collect TreeCorr jackknife products
-			corrs = [kk]
+			corrs = [kk, rr, nn]
 			plist = [c._jackknife_pairs() for c in corrs]
 			plist = list(zip(*plist))
-			func = lambda corrs: np.concatenate([c.getStat() for c in corrs])
+			func = lambda corrs: corrs[0].xi * corrs[0].weight / (corrs[1].weight * corrs[2].tot / corrs[1].tot)
 			v, w = treecorr.binnedcorr2._make_cov_design_matrix(corrs, plist, func, 'jackknife')
-			output = np.column_stack((r, xikk, varw**0.5, KK, np.diag(kk.cov)**0.5))
-			np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xikk','noise','KKpairs','xikk_jackknife_err')))
-			np.savetxt(outfile.replace('.dat', '.cov'), kk.cov)
+			vmean = np.mean(v, axis=0)
+			v -= vmean
+			C = (1.-1./len(v)) * v.conj().T.dot(v)
+			output = np.column_stack((r, xikk, varxi**0.5, kk.xi, KK, RR, np.diag(C)**0.5))
+			np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xikk','noise','KKraw','KKpairs','RRpairs','xikk_jackknife_err')))
+			np.savetxt(outfile.replace('.dat', '.cov'), C)
 			np.savetxt(outfile.replace('.dat', '.jk'), v, header='shape = (N jk samples, N sep-bins)')
 
-		del data1, kk
+		del data1, rand1, kk, rr
 		if not auto:
-			del data2
+			del data2, rand2
 		gc.collect()
 
 	def compute_xigk_xyz(self, d1, r1, d2, r2, outfile, wcol1=None, wcol2=None, rwcol1=None, rwcol2=None):
-		xigk = np.zeros(self.nbins)
-		varxi = np.zeros(self.nbins)
-		DK = np.zeros(self.nbins)
-		RK = np.zeros(self.nbins)
-		RR = np.zeros(self.nbins)
-		meanr = np.zeros(self.nbins)
-		meanlogr = np.zeros(self.nbins)
-
-		if self.treejack != 0:
-			npatch = self.treejack
-			var_method = 'jackknife'
-		else:
-			npatch = 1
-			var_method = 'shot'
-
-		if self.treejack != 0 and self.treejack_save and os.path.exists(self.treejack_save):
-			rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, patch_centers=self.treejack_save)
-			patch_centers = self.treejack_save
-		else:
-			rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, npatch=npatch)
-			patch_centers = rand1.patch_centers
-			if self.treejack_save:
-				rand1.write_patch_centers(self.treejack_save)
-		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1, patch_centers=patch_centers)
-		data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2, k=d2[self.k2_col], patch_centers=patch_centers)
-		rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, patch_centers=patch_centers)
+		kw, var_method = self.get_catalog_args()
+		rand1 = treecorr.Catalog(x=r1[self.rand_x_col], y=r1[self.rand_y_col], z=r1[self.rand_z_col], is_rand=1, w=rwcol1, **kw)
+		rand2 = treecorr.Catalog(x=r2[self.rand_x_col], y=r2[self.rand_y_col], z=r2[self.rand_z_col], is_rand=1, w=rwcol2, patch_centers=rand1.patch_centers)
+		data1 = treecorr.Catalog(x=d1[self.x_col], y=d1[self.y_col], z=d1[self.z_col], w=wcol1, patch_centers=rand1.patch_centers)
+		data2 = treecorr.Catalog(x=d2[self.x_col], y=d2[self.y_col], z=d2[self.z_col], w=wcol2, k=d2[self.k2_col], patch_centers=rand1.patch_centers)
+		if self.treejack != 0 and self.treejack_save and not os.path.exists(self.treejack_save):
+			rand1.write_patch_centers(self.treejack_save)
 
 		conf = self.tc_proj_config.copy()
 		p_args = dict(xperiod=self.xperiod, yperiod=self.yperiod, zperiod=self.zperiod)
 		nk = treecorr.NKCorrelation(conf, **p_args)
 		rk = treecorr.NKCorrelation(conf, **p_args)
+		nn = treecorr.NNCorrelation(conf, **p_args)
+		nr = treecorr.NNCorrelation(conf, **p_args)
 		rr = treecorr.NNCorrelation(conf, **p_args)
-		nk.process_cross(data1, data2)
-		rk.process_cross(rand1, data2)
-		rr.process_cross(rand1, rand2)
+		nk.process(data1, data2)
+		rk.process(rand1, data2)
+		nn.process(data1, data2)
+		nr.process(rand1, data2)
+		rr.process(rand1, rand2)
 
 		# subtract randoms correlations
 		if self.compensated:
-			nk.calculateXi(rk)
+			xigk = (nk.raw_xi * nk.weight / nn.tot - rk.raw_xi * rk.weight / nr.tot) / (rr.weight / rr.tot)
+			varxi = nk.raw_varxi + rk.varxi
 		else: # or not
-			nk.calculateXi()
-		nk.finalize()
+			xigk = nk.raw_xi * nk.weight / nn.tot / (rr.weight / rr.tot)
+			varxi = nk.raw_varxi
 
-		# include RR normalisation here?
-
-		DK += nk.weight
-		RK += rk.weight
-		RR += rr.weight
-		meanr += nk.meanr
-		meanlogr += nk.meanlogr
-		varxi += nk.varxi
+		DK = nk.weight
+		RK = rk.weight
+		RR = rr.weight
+		meanr = nk.meanr
+		meanlogr = nk.meanlogr
 
 		r = np.column_stack((nk.rnom, meanr, meanlogr))
 		output = np.column_stack((r, xigk, varxi**0.5, DK, RK, RR))
 		np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigk','noise','DKpairs','RKpairs','RRpairs')))
-		if self.treejack != 0 and hasattr(nk, 'cov'):
+		if self.treejack != 0:
 			# collect TreeCorr jackknife products
-			corrs = [nk]
+			corrs = [nk, rk, rr, nn, nr]
 			plist = [c._jackknife_pairs() for c in corrs]
 			plist = list(zip(*plist))
-			func = lambda corrs: np.concatenate([c.getStat() for c in corrs])
+			if self.compensated:
+				func = lambda corrs: (corrs[0].raw_xi * corrs[0].weight / corrs[3].tot - corrs[1].raw_xi * corrs[1].weight / corrs[4].tot) / (corrs[2].weight / corrs[2].tot)
+			else:
+				func = lambda corrs: (corrs[0].raw_xi * corrs[0].weight / corrs[3].tot) / (corrs[2].weight / corrs[2].tot)
 			v, w = treecorr.binnedcorr2._make_cov_design_matrix(corrs, plist, func, 'jackknife')
-			output = np.column_stack((r, xigk, varxi**0.5, DK, RK, RR, np.diag(nk.cov)**0.5))
+			vmean = np.mean(v, axis=0)
+			v -= vmean
+			C = (1.-1./len(v)) * v.conj().T.dot(v)
+			output = np.column_stack((r, xigk, varxi**0.5, DK, RK, RR, np.diag(C)**0.5))
 			np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigk','noise','DKpairs','RKpairs','RRpairs','xigk_jackknife_err')))
-			np.savetxt(outfile.replace('.dat', '.cov'), nk.cov)
+			np.savetxt(outfile.replace('.dat', '.cov'), C)
 			np.savetxt(outfile.replace('.dat', '.jk'), v, header='shape = (N jk samples, N sep-bins)')
 
 		del data1, rand1, data2, rand2, nk, rk, rr
