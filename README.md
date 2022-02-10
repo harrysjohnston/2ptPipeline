@@ -25,7 +25,7 @@ Skyknife should be run against a uniform randoms catalogue before running w_pipe
 
 For use of the kmeans clustering routine, clone into this repository https://github.com/esheldon/kmeans_radec and follow the setup instructions, before running skyknife.py with the -kmeans command-line argument.
   
-Unfortunately never got round to doing something more clever with jackknifes than just looping over the samples and re-measuring each correlation - lots of duplicated computations. If one writes code to somehow track the jackknife_IDs of galaxy pairs, then the jackknife measurements could be assembled after a single run agains the catalogue.
+Unfortunately never got round to doing something more clever with jackknifes than just looping over the samples and re-measuring each correlation - lots of duplicated computations. If one writes code to somehow track the jackknife_IDs of galaxy pairs, then the jackknife measurements could be assembled after a single run against the catalogue.
 
 TreeCorr also implements a jackknife routine (which is collected much more efficiently), which is supported within this pipeline by the config argument jackknife.treejack=N -- requests N subsamples to be defined via kmeans, in 2D (3D) for RADEC (XYZ). This argument will override the jackknife.run= config argument that otherwise governs the jackknife covariance computation, but treejack is only supported for angular correlations w(theta) and Cartesian 3D clustering xi_gg(r) -- this is because the other 2-point functions involve auxiliary computations that will render the TreeCorr covariance output meaningless.
 
