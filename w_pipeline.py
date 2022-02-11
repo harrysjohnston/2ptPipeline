@@ -1073,7 +1073,7 @@ class Correlate:
 			wcols = []
 			for j, (cat, cut) in enumerate(zip(fits_cats, cat_cuts)):
 				if args.verbosity >= 1: print(next(piter))
-				cuts = cut[i].split('&')
+				cuts = [ci for ci in cut[i].split('&') if ci != '']
 				w = np.ones(len(cat), dtype=bool)
 
 				if cuts[0] == 'none':

@@ -21,6 +21,10 @@ def execute(block, config):
 	z_pk = block[power_section, 'z']
 	z = block[nz_section, 'z']
 
+	# some options below in case one encounters ringing/aliasing effects
+	# in Hankel transformation; upsampling, extrapolation, and zero-padding
+	# might help to stabilise the integrations
+
 	# limit scales
 	#cut = (k_h > 1e-4) & (k_h < 1e3)
 	#k_h, p_k = k_h[cut], p_k[:, cut]
