@@ -859,8 +859,8 @@ class Correlate:
 			func = lambda corrs: np.concatenate([c.getStat() for c in corrs])
 			v, w = treecorr.binnedcorr2._make_cov_design_matrix(corrs, plist, func, 'jackknife')
 			vmean = np.mean(v, axis=0)
-			v -= vmean
-			C = (1.-1./len(v)) * v.conj().T.dot(v)
+			v1 = v - vmean
+			C = (1.-1./len(v1)) * v1.conj().T.dot(v1)
 			output = np.column_stack((r, xigg, varxi**0.5, DD, DR, RD, RR, np.diag(C)**0.5))
 			np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigg','noise','DDpairs','DRpairs','RDpairs','RRpairs','xigg_jackknife_err')))
 			np.savetxt(outfile.replace('.dat', '.cov'), C)
@@ -919,8 +919,8 @@ class Correlate:
 			func = lambda corrs: corrs[0].xi * corrs[0].weight / (corrs[1].weight * corrs[2].tot / corrs[1].tot)
 			v, w = treecorr.binnedcorr2._make_cov_design_matrix(corrs, plist, func, 'jackknife')
 			vmean = np.mean(v, axis=0)
-			v -= vmean
-			C = (1.-1./len(v)) * v.conj().T.dot(v)
+			v1 = v - vmean
+			C = (1.-1./len(v1)) * v1.conj().T.dot(v1)
 			output = np.column_stack((r, xikk, varxi**0.5, kk.xi, KK, RR, np.diag(C)**0.5))
 			np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xikk','noise','KKraw','KKpairs','RRpairs','xikk_jackknife_err')))
 			np.savetxt(outfile.replace('.dat', '.cov'), C)
@@ -981,8 +981,8 @@ class Correlate:
 				func = lambda corrs: (corrs[0].raw_xi * corrs[0].weight / corrs[3].tot) / (corrs[2].weight / corrs[2].tot)
 			v, w = treecorr.binnedcorr2._make_cov_design_matrix(corrs, plist, func, 'jackknife')
 			vmean = np.mean(v, axis=0)
-			v -= vmean
-			C = (1.-1./len(v)) * v.conj().T.dot(v)
+			v1 = v - vmean
+			C = (1.-1./len(v1)) * v1.conj().T.dot(v1)
 			output = np.column_stack((r, xigk, varxi**0.5, DK, RK, RR, np.diag(C)**0.5))
 			np.savetxt(outfile, output, header='\t'.join(('rnom','meanr','meanlogr','xigk','noise','DKpairs','RKpairs','RRpairs','xigk_jackknife_err')))
 			np.savetxt(outfile.replace('.dat', '.cov'), C)
