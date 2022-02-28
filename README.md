@@ -32,3 +32,5 @@ TreeCorr also implements a jackknife routine (which is collected much more effic
 # Test installation
 
 Do ./run_tests.sh and expect to see a little plot of w(theta), w_g+, w_gx, and w_gg for a small test sample, after about a minute of computation (16 threads). Should match the image in the repository (values not meaningful).
+
+
