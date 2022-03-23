@@ -36,7 +36,7 @@ def execute(block, config):
 
 	# pad with zeros
 	#nzeros = 10
-	#logk = np.log10(k_h)
+	#logk = np.log10(k_h_)
 	#dlogk = np.diff(logk)[0]
 	#low_k = (logk[0] - dlogk * np.arange(1, nzeros+1))[::-1]
 	#high_k = logk[-1] + dlogk * np.arange(1, nzeros+1)
