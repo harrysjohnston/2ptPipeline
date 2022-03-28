@@ -1,6 +1,9 @@
 import numpy as np
 import pyccl as ccl
 from scipy.interpolate import interp1d
+# can replace this with e.g. CAMB transfer function
+# for greater accuracy of chi(z) computation, but
+# will be a bit slower - for user to decide
 cosmo = ccl.Cosmology(Omega_c=0.25, Omega_b=0.05, h=0.7,
 					  n_s=0.96, sigma8=0.8, m_nu=0.06,
 					  transfer_function='bbks')

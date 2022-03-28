@@ -25,16 +25,18 @@ def execute(block, config):
 	# in Hankel transformation; upsampling, extrapolation, and zero-padding
 	# might help to stabilise the integrations
 
-	# limit scales
+	# limit scales?
 	#cut = (k_h > 1e-4) & (k_h < 1e3)
 	#k_h, p_k = k_h[cut], p_k[:, cut]
 
-	# interpolate to sample redshift coordinates & upsampled k's
+	# define new k range?
 	#k_h_ = np.logspace(np.log10(k_h.min()), np.log10(k_h.max()), 600)
 	k_h_ = k_h.copy()
+
+	# interpolate to sample redshift coordinates
 	p_k_new = interp2d(k_h, z_pk, p_k, kind='cubic', bounds_error=False, fill_value=0.)(k_h_, z)
 
-	# pad with zeros
+	# pad with zeros?
 	#nzeros = 10
 	#logk = np.log10(k_h_)
 	#dlogk = np.diff(logk)[0]

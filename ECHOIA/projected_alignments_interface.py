@@ -36,9 +36,11 @@ def execute(block, config):
 	Wz = compute_Wz(z, nz1, nz2)
 	w_r = compute_w(Wz, w_rz, nbin, dz)
 
-	# save projected correlations to datablock
+	# save projected correlations & window function to datablock
 	block[input_section, f'{corr_type}_r_1_1'] = w_r
 	block[input_section, 'r_p'] = r_p
+	block[input_section, 'w_z'] = Wz
+	block[input_section, 'z'] = z
 
 	return 0
 
