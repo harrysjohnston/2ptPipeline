@@ -33,4 +33,27 @@ TreeCorr also implements a jackknife routine (which is collected much more effic
 
 Do ./run_tests.sh and expect to see a little plot of w(theta), w_g+, w_gx, and w_gg for a small test sample, after about a minute of computation (16 threads). Should match the image in the repository (values not meaningful).
 
+# Credit
 
+This pipeline is released under a CC-BY 4.0 license: https://creativecommons.org/licenses/by/4.0/ .
+
+If making use of the pipeline, please cite:
+```
+@ARTICLE{2019A&A...624A..30J,
+       author = {{Johnston}, Harry and {Georgiou}, Christos and {Joachimi}, Benjamin and {Hoekstra}, Henk and {Chisari}, Nora Elisa and {Farrow}, Daniel and {Fortuna}, Maria Cristina and {Heymans}, Catherine and {Joudaki}, Shahab and {Kuijken}, Konrad and {Wright}, Angus},
+        title = "{KiDS+GAMA: Intrinsic alignment model constraints for current and future weak lensing cosmology}",
+      journal = {\aap},
+     keywords = {gravitational lensing: weak, cosmology: observations, large-scale structure of Universe, Astrophysics - Cosmology and Nongalactic Astrophysics},
+         year = 2019,
+        month = apr,
+       volume = {624},
+          eid = {A30},
+        pages = {A30},
+          doi = {10.1051/0004-6361/201834714},
+archivePrefix = {arXiv},
+       eprint = {1811.09598},
+ primaryClass = {astro-ph.CO},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2019A&A...624A..30J},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+```
